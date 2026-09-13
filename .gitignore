@@ -1,0 +1,19 @@
+# Extracted Noita game files. These belong to Nolla Games. Never commit them.
+gamedata/
+
+# Build scratch
+*.pdb
+probe/probe_log.txt
+
+
+dist/*.png
+!docs/*.png
+
+# Test harness binaries (only the overlay itself is shipped)
+dist/Probe.exe
+dist/Simulate.exe
+dist/Preview.exe
+
+# Terminal Paste Image folder
+.cp-images/
+dist/Shots.exe
