@@ -5,15 +5,12 @@ gamedata/
 *.pdb
 probe/probe_log.txt
 
-
+# Screenshots are generated into docs/, everything else is scratch
 dist/*.png
 !docs/*.png
 
-# Test harness binaries (only the overlay itself is shipped)
+# Test harness binaries. Only the overlay itself is shipped.
 dist/Probe.exe
 dist/Simulate.exe
 dist/Preview.exe
-
-# Terminal Paste Image folder
-.cp-images/
 dist/Shots.exe
