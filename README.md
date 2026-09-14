@@ -36,6 +36,10 @@ Game closed. It offers to start it for you.
 
 ![not running](docs/06-not-running.png)
 
+Extras switched on. Two more lists, hidden unless you ask for them.
+
+![extras on](docs/07-extras-on.png)
+
 ## How it works
 
 It only reads files Noita already writes:
@@ -54,14 +58,48 @@ random, so chunk coordinates map straight to a biome.
 
 Goals are tiered. Tiers unlock as you play.
 
-| Tier | Unlocks when |
-| --- | --- |
-| Foundations | always |
-| Detours | you reach the Coal Pits |
-| Off the Path, Far Reaches, Mastery | you finish a run |
+| Tier | Goals | Unlocks when |
+| --- | --- | --- |
+| Foundations | 4 | always |
+| Detours | 12 | you reach the Coal Pits |
+| Off the Path | 9 | you finish a run |
+| Far Reaches | 8 | you finish a run |
+| Mastery | 16 | you finish a run |
+| Leads | 8 | you finish a run |
+| Unrecorded | 15 | only if you turn extras on |
+| Per run only | 8 | only if you turn extras on |
 
 A place you have not found shows a direction, not a name. Once you have been,
 it shows the real name plus a reminder of where it was.
+
+## What can and cannot be tracked
+
+Most of Noita records nothing. Of 76 player triggered scripts in the game,
+only 10 write a flag that survives the run. So the board has three kinds of
+entry, and it is honest about which is which.
+
+| Kind | How it is checked |
+| --- | --- |
+| Places and flags | detected automatically, live |
+| Leads | nothing detects them, you tick them yourself |
+| Extras | same, and hidden until you ask for them |
+
+**Leads** are things to notice rather than tasks. They never become the
+recommended task. Example: the stone mushroom far east is a real biome, so
+visiting it is detected, but the thing that makes it interesting writes no
+flag at all, so that half is a lead.
+
+**Extras** are off by default. Right click the overlay and pick
+**Add other items** to show them. They are split in two because the divide
+matters:
+
+- **Unrecorded** the game never writes these down, in any form. They can
+  never be automatic.
+- **Per run only** the game does record these, with a run flag that is wiped
+  when the run ends. These could become automatic later.
+
+Click any lead or extra to tick it off. Clicking a normal goal pins it instead,
+since there is nothing to tick on something already tracked.
 
 ## Build
 
@@ -71,7 +109,7 @@ Needs nothing installed. Uses the .NET Framework compiler built into Windows.
 powershell -File build.ps1
 ```
 
-Output is `dist/NoitaOverlay.exe`, about 67 KB.
+Output is `dist/NoitaOverlay.exe`, about 75 KB.
 
 To regenerate the biome table you need Noita installed:
 
@@ -82,13 +120,21 @@ powershell -File tools/gen_biomemap.ps1
 
 ## Settings
 
-Right click the overlay for transparency and expand delay.
+Right click the overlay for transparency, expand delay, and the extra lists.
 Settings live in `%APPDATA%\NoitaOverlay\settings.ini`.
+
+| Setting | Default |
+| --- | --- |
+| `idle_opacity` | 0.28 |
+| `hover_opacity` | 0.97 |
+| `dwell_ms` | 200, delay before it expands |
+| `show_extras` | 0, the two extra lists are hidden |
 
 Other files there:
 
 - `history.txt` places you have visited
 - `pinned.txt` goals you pinned
+- `leads.txt` leads and extras you ticked off
 
 ## Notes
 
