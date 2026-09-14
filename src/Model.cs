@@ -182,7 +182,14 @@ namespace NoitaOverlay {
       new TierDef(4, "Far Reaches",  "few ever stand here",             0xE3, 0x7F, 0x3C),
       new TierDef(5, "Mastery",      "the game behind the game",        0xD0, 0x5A, 0x7A),
       new TierDef(6, "Leads",        "things to notice, tick them off yourself", 0x9A, 0x8C, 0xC4),
+      // Hidden unless you turn extras on. Split on whether the game records anything at all,
+      // because the second list could become automatic later and the first never can.
+      new TierDef(7, "Unrecorded",   "the game keeps no record of these",        0x88, 0x8E, 0x9A),
+      new TierDef(8, "Per run only", "the game notes these, then forgets",       0x6F, 0x9A, 0x90),
     };
+
+    /// <summary>Tiers 7 and 8 are the opt-in list. Off unless the user turns extras on.</summary>
+    public static bool IsExtra(int tier) { return tier >= 7; }
 
     /// <summary>Collapses Noita's 128 internal biome ids onto the handful of places a player thinks in.</summary>
     public static string Canon(string biome) {
@@ -373,6 +380,38 @@ namespace NoitaOverlay {
         "Some things are listening.",                                   Source.Manual, "l_music"),
       new Goal(6, "l_eyes",    "The symbols repeat",
         "The same marks turn up in unrelated places.", Source.Manual, "l_eyes"),
+
+      // ---- 7. Unrecorded (opt-in) -----------------------------------------
+      // Verified against the game scripts: none of these write any flag, run or
+      // persistent. There is nothing to detect, now or ever.
+      new Goal(7, "x_fungal",   "Cause a fungal shift",            "Materials can be made to swap places.",       Source.Manual, "x_fungal"),
+      new Goal(7, "x_rec_water","Fill the water receptacle",       "A basin that wants one specific liquid.",     Source.Manual, "x_rec_water"),
+      new Goal(7, "x_rec_oil",  "Fill the oil receptacle",         "Another basin, another liquid.",              Source.Manual, "x_rec_oil"),
+      new Goal(7, "x_rec_steam","Fill the steam receptacle",       "The third one is harder to carry.",           Source.Manual, "x_rec_steam"),
+      new Goal(7, "x_vaultlab", "Solve the Vault lab puzzle",      "It pays out a wand.",                         Source.Manual, "x_vaultlab"),
+      new Goal(7, "x_oiltank",  "Solve the oil tank puzzle",       "Somewhere east, and messy.",                  Source.Manual, "x_oiltank"),
+      new Goal(7, "x_forge",    "Use the forge",                   "Leave something forgeable beside it.",        Source.Manual, "x_forge"),
+      new Goal(7, "x_eye",      "Work out the eyes",               "Eyes and eye sockets, in several places.",    Source.Manual, "x_eye"),
+      new Goal(7, "x_dupe",     "Use the duplicator",              "It makes a second one.",                      Source.Manual, "x_dupe"),
+      new Goal(7, "x_egg",      "Hatch an egg",                    "More than one kind exists.",                  Source.Manual, "x_egg"),
+      new Goal(7, "x_bunker",   "Get inside a bunker",             "Two of them, sealed.",                        Source.Manual, "x_bunker"),
+      new Goal(7, "x_crystal",  "Break the crystals",              "Snow, ghost, and a darker one.",              Source.Manual, "x_crystal"),
+      new Goal(7, "x_workshop", "Find the workshop",               "Someone was building here.",                  Source.Manual, "x_workshop"),
+      new Goal(7, "x_swing",    "Solve the swinging puzzle",       "Timing, not force.",                          Source.Manual, "x_swing"),
+      new Goal(7, "x_gate",     "Open the wizard cave gate",       "It is shut for a reason.",                    Source.Manual, "x_gate"),
+
+      // ---- 8. Per run only (opt-in) ---------------------------------------
+      // These DO get recorded, but with GameAddFlagRun: they live in world_state.xml,
+      // are wiped on a new run, and only land on disk when you quit. Manual for now;
+      // could be harvested automatically at end of run later.
+      new Goal(8, "r_kantele",  "Play a kantele song",             "It has four tunes. One is not like the others.", Source.Manual, "r_kantele"),
+      new Goal(8, "r_ocarina",  "Play an ocarina song",            "Same four tunes, different instrument.",      Source.Manual, "r_ocarina"),
+      new Goal(8, "r_alchemy",  "Play the one that changes things","Both instruments know it.",                   Source.Manual, "r_alchemy"),
+      new Goal(8, "r_music",    "Set the music machines going",    "There are four of them.",                     Source.Manual, "r_music"),
+      new Goal(8, "r_hands",    "Deal with the statue hands",      "Three of them.",                              Source.Manual, "r_hands"),
+      new Goal(8, "r_gold",     "Make the gold explode",           "Greed has a physical form.",                  Source.Manual, "r_gold"),
+      new Goal(8, "r_fishing",  "Visit both fishing huts",         "Far out, on either side.",                    Source.Manual, "r_fishing"),
+      new Goal(8, "r_greed",    "Take the greed curse, then lose it","Both halves count.",                        Source.Manual, "r_greed"),
     };
   }
 }

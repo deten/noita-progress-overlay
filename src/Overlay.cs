@@ -25,6 +25,7 @@ namespace NoitaOverlay {
     public string Toast; public DateTime ToastUntil;
 
     public bool Compact;                                  // idle: just the next task + pins
+    public bool ShowExtras;                               // opt-in wiki-ish checkbox tiers
     public HashSet<string> Pinned = new HashSet<string>();
     public Suggestion Next, Side;
     public Action PinsChanged;
@@ -250,6 +251,7 @@ namespace NoitaOverlay {
 
       // ---- tiers ----------------------------------------------------------
       foreach (var t in Model.Tiers) {
+        if (Model.IsExtra(t.N) && !ShowExtras) continue;
         var goals = Model.Goals.Where(x => x.Tier == t.N).ToArray();
         int done = goals.Count(x => Tracker.Done(x, Snap));
         var tc = Color.FromArgb(t.R, t.G, t.B);
@@ -457,6 +459,16 @@ namespace NoitaOverlay {
       menu.Items.Add(hover);
       menu.Items.Add(dwell);
       menu.Items.Add(new ToolStripSeparator());
+      var extras = new ToolStripMenuItem("Add other items");
+      extras.ToolTipText = "Extra checkbox lists. Nothing detects these, you tick them yourself.";
+      extras.Checked = _cfg.ShowExtras;
+      extras.Click += (s, e) => {
+        _cfg.ShowExtras = !_cfg.ShowExtras;
+        extras.Checked = _board.ShowExtras = _cfg.ShowExtras;
+        _board.Invalidate();
+      };
+      menu.Items.Add(extras);
+      menu.Items.Add(new ToolStripSeparator());
       menu.Items.Add(new ToolStripMenuItem("Clear pinned", null, (s, e) => {
         _board.Pinned.Clear(); SavePins(); _board.Invalidate();
       }));
@@ -618,6 +630,7 @@ namespace NoitaOverlay {
       _barH = barH;
       _board.Compact = true;
       _board.HideDone = _cfg.HideDone;
+      _board.ShowExtras = _cfg.ShowExtras;
       toggle.Text = _board.HideDone ? "show all" : "hide done";
       _board.PinsChanged = SavePins;
       _board.LaunchClicked = LaunchNoita;

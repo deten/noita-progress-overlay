@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Drawing;
 using System.Drawing.Drawing2D;
 using System.IO;
@@ -31,7 +31,7 @@ namespace NoitaOverlay {
     };
     static readonly string[] VeteranFlags = { "boss_centipede", "progress_ending0", "essence_laser" };
 
-    static void Shot(string file, string status, Snapshot snap, bool compact, bool hideDone) {
+    static void Shot(string file, string status, Snapshot snap, bool compact, bool hideDone, bool extras = false) {
       int w = LogicalWidth * Scale;
       int barH = 28 * Scale;
 
@@ -41,6 +41,7 @@ namespace NoitaOverlay {
         Status = status,
         Compact = compact,
         HideDone = hideDone,
+        ShowExtras = extras,
         Next = Model.Recommend(snap)
       };
       board.Side = Model.Explore(snap, board.Next == null ? null : board.Next.GoalId);
@@ -106,6 +107,9 @@ namespace NoitaOverlay {
       var off = Make("", new string[0], new string[0], 0);
       off.GameRunning = false; off.InRun = false; off.Moving = false; off.Seed = "";
       Shot("06-not-running.png", "Noita is not running", off, true, true);
+
+      // 7: the opt-in extra checkbox tiers, normally hidden.
+      Shot("07-extras-on.png", "Paused in a Holy Mountain", vet, false, true, true);
     }
   }
 }
