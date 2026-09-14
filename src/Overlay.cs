@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Drawing;
 using System.Drawing.Drawing2D;
@@ -30,6 +30,7 @@ namespace NoitaOverlay {
     public Action PinsChanged;
     public Action LaunchClicked;
     public Action RefreshClicked;
+    public Action<string> ManualToggled;
     Rectangle _launchRect, _statusRect;
     /// <summary>Height the content actually needs, so the form can size itself to it.</summary>
     public int ContentHeight { get; private set; }
@@ -81,14 +82,18 @@ namespace NoitaOverlay {
           return;
         }
       }
-      // Clicking a goal pins it, so it stays visible next to the recommendation.
       foreach (var h in _goalHits) {
-        if (h.Item1.Contains(p)) {
+        if (!h.Item1.Contains(p)) continue;
+        var goal = Model.Goals.FirstOrDefault(x => x.Id == h.Item2);
+        // Leads have nothing to detect, so clicking one ticks it off instead of pinning it.
+        if (goal != null && goal.Source == Source.Manual) {
+          if (ManualToggled != null) ManualToggled(goal.Key);
+        } else {
           if (Pinned.Contains(h.Item2)) Pinned.Remove(h.Item2); else Pinned.Add(h.Item2);
           if (PinsChanged != null) PinsChanged();
-          Invalidate();
-          return;
         }
+        Invalidate();
+        return;
       }
     }
 
@@ -577,7 +582,7 @@ namespace NoitaOverlay {
       Location = loc;
 
       var bar = new Panel { Dock = DockStyle.Top, Height = barH, BackColor = Palette.BgAlt };
-      var close  = MakeBtn("✕", (int)(28 * sc), (s, e) => Close());
+      var close  = MakeBtn("âœ•", (int)(28 * sc), (s, e) => Close());
       _board.HideDone = true;                       // default: only show what is left
       var toggle = MakeBtn("show all", (int)(66 * sc), null);
       toggle.Click += (s, e) => {
@@ -587,7 +592,7 @@ namespace NoitaOverlay {
         _board.Invalidate();
       };
       var title = new Label {
-        Text = "NOITA  ·  what is left",
+        Text = "NOITA  Â·  what is left",
         ForeColor = Palette.Dim, Font = new Font("Segoe UI", 8.25f, FontStyle.Bold),
         Dock = DockStyle.Fill, TextAlign = ContentAlignment.MiddleLeft,
         Padding = new Padding((int)(10 * sc), 0, 0, 0), AutoEllipsis = true
@@ -617,6 +622,7 @@ namespace NoitaOverlay {
       _board.PinsChanged = SavePins;
       _board.LaunchClicked = LaunchNoita;
       _board.RefreshClicked = Refresh_;
+      _board.ManualToggled = id => { _tracker.ToggleManual(id); Refresh_(); };
       LoadPins();
       BuildMenu();
       // Track manual resizes so the expanded height is whatever the user last chose.

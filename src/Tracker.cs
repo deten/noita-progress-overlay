@@ -20,6 +20,7 @@ namespace NoitaOverlay {
     public int    OrbCount;
     public HashSet<string> Flags  = new HashSet<string>();
     public HashSet<string> Places = new HashSet<string>();   // lifetime, canonical
+    public HashSet<string> Manual = new HashSet<string>();   // leads the player ticked off
     public string NewlyEntered;               // set for one tick when a new place is first reached
   }
 
@@ -33,7 +34,9 @@ namespace NoitaOverlay {
 
     readonly string _root;                    // ...\Nolla_Games_Noita
     readonly string _historyPath;
+    readonly string _manualPath;
     readonly HashSet<string> _history = new HashSet<string>();
+    readonly HashSet<string> _manual = new HashSet<string>();
     string _lastPlace = "";
 
     public string SaveDir { get; private set; }
@@ -47,7 +50,21 @@ namespace NoitaOverlay {
       string dir = Path.Combine(appdata, "NoitaOverlay");
       Directory.CreateDirectory(dir);
       _historyPath = Path.Combine(dir, "history.txt");
+      _manualPath  = Path.Combine(dir, "leads.txt");
       LoadHistory();
+      try {
+        if (File.Exists(_manualPath))
+          foreach (var l in File.ReadAllLines(_manualPath)) {
+            var t = l.Trim();
+            if (t.Length > 0) _manual.Add(t);
+          }
+      } catch { }
+    }
+
+    /// <summary>Tick a lead off, or un-tick it. Nothing in the game records these.</summary>
+    public void ToggleManual(string id) {
+      if (_manual.Contains(id)) _manual.Remove(id); else _manual.Add(id);
+      try { File.WriteAllLines(_manualPath, _manual.ToArray()); } catch { }
     }
 
     // ---- history -----------------------------------------------------------
@@ -210,6 +227,7 @@ namespace NoitaOverlay {
         }
 
         s.Places = new HashSet<string>(_history);
+        s.Manual = new HashSet<string>(_manual);
       } catch (Exception ex) {
         Error = ex.Message;
       }
@@ -221,6 +239,7 @@ namespace NoitaOverlay {
         case Source.Place:    return s.Places.Contains(key);
         case Source.Flag:     return s.Flags.Contains(key);
         case Source.OrbCount: return s.OrbCount >= n;
+        case Source.Manual:   return s.Manual.Contains(key);
       }
       return false;
     }

@@ -3,8 +3,12 @@ using System.Collections.Generic;
 
 namespace NoitaOverlay {
 
-  /// <summary>How a goal decides it is complete.</summary>
-  internal enum Source { Place, Flag, OrbCount }
+  /// <summary>
+  /// How a goal decides it is complete. Manual exists because plenty of Noita has no
+  /// persistent flag behind it: the whole sun chain writes nothing until its final step,
+  /// so a player three steps in would otherwise see no sign of it at all.
+  /// </summary>
+  internal enum Source { Place, Flag, OrbCount, Manual }
 
   /// <summary>
   /// Something you can actually accomplish at a place, as opposed to merely standing in it.
@@ -78,6 +82,9 @@ namespace NoitaOverlay {
       return BeatenTheGame(s);
     }
 
+    /// <summary>Leads are prompts, not tasks, so they never become the recommendation.</summary>
+    static bool IsLead(Goal g) { return g.Tier == 6 || g.Source == Source.Manual; }
+
     /// <summary>
     /// Picks the one thing to put in front of the player. Preference order:
     ///   0. while the main descent is unfinished, that is the whole answer -- do not
@@ -118,7 +125,7 @@ namespace NoitaOverlay {
       for (int tier = 1; tier <= 5; tier++) {
         if (!TierUnlocked(tier, s)) continue;
         foreach (var g in Goals) {
-          if (g.Tier != tier || !Tracker.Reached(g, s)) continue;
+          if (g.Tier != tier || IsLead(g) || !Tracker.Reached(g, s)) continue;
           foreach (var d in g.Deeds)
             if (!Tracker.DeedDone(d, s))
               return new Suggestion { GoalId = g.Id, Tier = g.Tier, Title = g.Title + " - " + d.Title,
@@ -131,7 +138,7 @@ namespace NoitaOverlay {
       for (int tier = 1; tier <= 5; tier++) {
         if (!TierUnlocked(tier, s)) continue;
         foreach (var g in Goals) {
-          if (g.Tier != tier || Tracker.Done(g, s)) continue;
+          if (g.Tier != tier || IsLead(g) || Tracker.Done(g, s)) continue;
           bool reached = Tracker.Reached(g, s);
           return new Suggestion { GoalId = g.Id, Tier = g.Tier, Title = g.DisplayTitle(reached),
                                   Hint = g.Hint, Reason = TierName(tier) };
@@ -174,6 +181,7 @@ namespace NoitaOverlay {
       new TierDef(3, "Off the Path", "the world is wider than the pit", 0xE0, 0xB0, 0x4C),
       new TierDef(4, "Far Reaches",  "few ever stand here",             0xE3, 0x7F, 0x3C),
       new TierDef(5, "Mastery",      "the game behind the game",        0xD0, 0x5A, 0x7A),
+      new TierDef(6, "Leads",        "things to notice, tick them off yourself", 0x9A, 0x8C, 0xC4),
     };
 
     /// <summary>Collapses Noita's 128 internal biome ids onto the handful of places a player thinks in.</summary>
@@ -342,6 +350,24 @@ namespace NoitaOverlay {
       new Goal(5, "t5_minit",    "Finish fast",              "Much faster than you think is possible.",      Source.Flag, "progress_minit"),
       new Goal(5, "t5_ngplus",   "Begin again, changed",     "The run remembers.",                           Source.Flag, "progress_ngplus"),
       new Goal(5, "t5_nightmare","Survive Nightmare mode",   "The game offers this one openly.",             Source.Flag, "progress_nightmare"),
+
+      // ---- 6. Leads -------------------------------------------------------
+      // The game records none of these, so there is nothing to detect. They are
+      // pointers at chains that start small and go a long way. Tick them yourself.
+      new Goal(6, "l_stones",  "Some rocks are not scenery",
+        "A few have names. Carrying one somewhere may matter.",         Source.Manual, "l_stones"),
+      new Goal(6, "l_seed",    "Something small can be planted",
+        "It does nothing where you found it.",                          Source.Manual, "l_seed"),
+      new Goal(6, "l_moon",    "The moon is not out of reach",
+        "And it is not the only one.",                                  Source.Manual, "l_moon"),
+      new Goal(6, "l_carry",   "Things can be carried further than seems sensible",
+        "The long chains start with not leaving something behind.", Source.Manual, "l_carry"),
+      new Goal(6, "l_tablets", "The tablets can be read",
+        "There are more of them than you have found.",                  Source.Manual, "l_tablets"),
+      new Goal(6, "l_music",   "Sound is used for more than atmosphere",
+        "Some things are listening.",                                   Source.Manual, "l_music"),
+      new Goal(6, "l_eyes",    "The symbols repeat",
+        "The same marks turn up in unrelated places.", Source.Manual, "l_eyes"),
     };
   }
 }
