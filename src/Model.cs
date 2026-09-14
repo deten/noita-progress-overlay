@@ -238,6 +238,7 @@ namespace NoitaOverlay {
       { "sandcave",     "the Sandcave" },           { "lavalake",     "the Lava Lake" },
       { "lava",         "the lava" },               { "gold",         "a vein of gold" },
       { "essenceroom",  "an Essence chamber" },     { "watercave",    "a water cave" },
+      { "funroom",      "the stone mushroom" },
       { "ghost_secret", "a hidden chamber" },       { "mestari_secret", "a hidden chamber" },
       { "solid_wall_hidden_cavern", "a hidden cavern" },
     };
@@ -309,6 +310,8 @@ namespace NoitaOverlay {
         .With(new Deed("and meet what flies there", "You are not alone up there.", "miniboss_sky")),
       new Goal(3, "t3_clouds",  "The Cloudscape",      "There is ground up there too, of a sort.",                   Source.Place, "clouds")
         .Veiled("High above the surface").At("High above the surface."),
+      new Goal(3, "t3_mushroom","The stone mushroom",  "Big enough to spot if you go looking.",                      Source.Place, "funroom")
+        .Veiled("Something out east was grown, not dug").At("Far east, at Snowy Depths depth."),
 
       // ---- 4. Far Reaches -------------------------------------------------
       new Goal(4, "t4_meat",   "The Meat Realm",  "Somewhere the world stops being rock.",  Source.Place, "meat")
@@ -354,6 +357,8 @@ namespace NoitaOverlay {
       // ---- 6. Leads -------------------------------------------------------
       // The game records none of these, so there is nothing to detect. They are
       // pointers at chains that start small and go a long way. Tick them yourself.
+      new Goal(6, "l_mushroom","Standing at the mushroom does nothing",
+        "Nothing to you as you are, anyway. Arrive differently.",       Source.Manual, "l_mushroom"),
       new Goal(6, "l_stones",  "Some rocks are not scenery",
         "A few have names. Carrying one somewhere may matter.",         Source.Manual, "l_stones"),
       new Goal(6, "l_seed",    "Something small can be planted",
