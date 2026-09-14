@@ -4,9 +4,8 @@ using System.Collections.Generic;
 namespace NoitaOverlay {
 
   /// <summary>
-  /// How a goal decides it is complete. Manual exists because plenty of Noita has no
-  /// persistent flag behind it: the whole sun chain writes nothing until its final step,
-  /// so a player three steps in would otherwise see no sign of it at all.
+  /// How a goal decides it is complete. Manual is for things the game does not record:
+  /// the sun chain, for example, writes no flag until its final step.
   /// </summary>
   internal enum Source { Place, Flag, OrbCount, Manual }
 
@@ -69,9 +68,8 @@ namespace NoitaOverlay {
     }
 
     /// <summary>
-    /// Tiers reveal themselves as you earn them. A first-time player should be looking at one
-    /// instruction, not at a catalogue of places they have no idea how to reach -- and naming
-    /// the Meat Realm to someone who has not yet cleared the Mines spoils it for no gain.
+    /// Tiers unlock as you play, so a first-time player sees one instruction rather than a
+    /// catalogue of places they cannot reach yet.
     ///   1 Foundations  always
     ///   2 Detours      once you are actually descending (reached the Coal Pits)
     ///   3-5            once you have finished a run
@@ -150,9 +148,8 @@ namespace NoitaOverlay {
     }
 
     /// <summary>
-    /// A standing invitation to wander, shown small and dim underneath the real task.
-    /// Deliberately never urgent: it exists so a player knows the world is wider,
-    /// not so they feel behind on it.
+    /// An optional place to wander to, shown small and dim under the real task.
+    /// Never marked urgent.
     /// </summary>
     public static Suggestion Explore(Snapshot s, string excludeGoalId) {
       // Somewhere you have never been, shallowest first, never the main line.
@@ -257,10 +254,9 @@ namespace NoitaOverlay {
     }
 
     /// <summary>
-    /// The board. Hints name a destination or a shape, never a method or a payoff --
-    /// enough to make you go look, not enough to spoil finding out.
-    /// Deeds are things the game records you having DONE somewhere, so that walking
-    /// through a biome no longer counts as having finished with it.
+    /// The board. Hints name a destination or a shape, never a method or a payoff.
+    /// Deeds are things the game records you having DONE somewhere, so walking through
+    /// a biome does not count as having finished with it.
     /// </summary>
     public static readonly Goal[] Goals = {
       // ---- 1. Foundations -------------------------------------------------

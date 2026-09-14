@@ -75,8 +75,7 @@ it shows the real name plus a reminder of where it was.
 ## What can and cannot be tracked
 
 Most of Noita records nothing. Of 76 player triggered scripts in the game,
-only 10 write a flag that survives the run. So the board has three kinds of
-entry, and it is honest about which is which.
+only 10 write a flag that survives the run. The board has three kinds of entry.
 
 | Kind | How it is checked |
 | --- | --- |
@@ -86,12 +85,11 @@ entry, and it is honest about which is which.
 
 **Leads** are things to notice rather than tasks. They never become the
 recommended task. Example: the stone mushroom far east is a real biome, so
-visiting it is detected, but the thing that makes it interesting writes no
-flag at all, so that half is a lead.
+visiting it is detected, but triggering it writes no flag, so that half is
+a lead.
 
 **Extras** are off by default. Right click the overlay and pick
-**Add other items** to show them. They are split in two because the divide
-matters:
+**Add other items** to show them. They are split in two:
 
 - **Unrecorded** the game never writes these down, in any form. They can
   never be automatic.
