@@ -38,7 +38,6 @@ namespace NoitaOverlay {
       var board = new Board {
         ScaleOverride = Scale,
         Snap = snap,
-        Status = status,
         Compact = compact,
         HideDone = hideDone,
         ShowExtras = extras,
@@ -62,18 +61,41 @@ namespace NoitaOverlay {
       using (var g = Graphics.FromImage(outp)) {
         g.SmoothingMode = SmoothingMode.AntiAlias;
         g.TextRenderingHint = System.Drawing.Text.TextRenderingHint.ClearTypeGridFit;
+        // The bar is the status line now: dot, where you are, seed, then the buttons.
         using (var b = new SolidBrush(Palette.BgAlt)) g.FillRectangle(b, 0, 0, w, barH);
-        using (var f = new Font("Segoe UI", 8.25f, FontStyle.Bold))
-        using (var b = new SolidBrush(Palette.Dim))
-          g.DrawString("NOITA - what is left", f, b, 10 * Scale, 7 * Scale);
+        int right = w;
         using (var f = new Font("Segoe UI", 8f))
         using (var b = new SolidBrush(Palette.Dim)) {
-          g.DrawString("X", f, b, w - 22 * Scale, 8 * Scale);
+          g.DrawString("X", f, b, w - 20 * Scale, 8 * Scale);   right -= 28 * Scale;
           var lbl = hideDone ? "show all" : "hide done";
           var sz = g.MeasureString(lbl, f);
-          g.DrawString(lbl, f, b, w - sz.Width - 40 * Scale, 8 * Scale);
+          g.DrawString(lbl, f, b, right - sz.Width - 6 * Scale, 8 * Scale);
+          right -= (int)sz.Width + 14 * Scale;
           var ls = g.MeasureString("lock", f);
-          g.DrawString("lock", f, b, w - sz.Width - ls.Width - 58 * Scale, 8 * Scale);
+          g.DrawString("lock", f, b, right - ls.Width - 6 * Scale, 8 * Scale);
+          right -= (int)ls.Width + 14 * Scale;
+        }
+        int d = 7 * Scale, lpad = 9 * Scale, tx = lpad + 14 * Scale;
+        using (var b = new SolidBrush(snap.GameRunning ? Palette.Live : Palette.Dimmer))
+          g.FillEllipse(b, lpad, (barH - d) / 2, d, d);
+        using (var fb = new Font("Segoe UI", 9f, FontStyle.Bold))
+        using (var fs = new Font("Segoe UI", 8.25f, FontStyle.Regular)) {
+          float lineH = g.MeasureString("Xg", fb).Height;
+          float statusW = g.MeasureString(status, fb).Width;
+          if (snap.Seed.Length > 0 && snap.InRun) {
+            var seed = "seed " + snap.Seed;
+            var sz = g.MeasureString(seed, fs);
+            if (right - tx - statusW > sz.Width + 12 * Scale) {
+              using (var b = new SolidBrush(Palette.Dimmer))
+                g.DrawString(seed, fs, b, right - sz.Width - 6 * Scale,
+                             (barH - g.MeasureString("Xg", fs).Height) / 2);
+              right -= (int)sz.Width + 10 * Scale;
+            }
+          }
+          using (var b = new SolidBrush(snap.GameRunning ? Palette.Text : Palette.Dim))
+            g.DrawString(status, fb, b,
+              new RectangleF(tx, (barH - lineH) / 2, Math.Max(10, right - tx), lineH * 1.2f),
+              new StringFormat(StringFormatFlags.NoWrap) { Trimming = StringTrimming.EllipsisCharacter });
         }
         g.DrawImage(body, 0, barH);
       }

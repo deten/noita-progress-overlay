@@ -21,18 +21,14 @@ namespace NoitaOverlay {
   internal sealed class Board : Panel {
     public Snapshot Snap = new Snapshot();
     public bool HideDone;
-    public string Status = "";
-    public string Toast; public DateTime ToastUntil;
+        public string Toast; public DateTime ToastUntil;
 
     public bool Compact;                                  // idle: just the next task + pins
     public bool ShowExtras;                               // opt-in wiki-ish checkbox tiers
     public HashSet<string> Pinned = new HashSet<string>();
     public Suggestion Next, Side;
     public Action PinsChanged;
-    public Action LaunchClicked;
-    public Action RefreshClicked;
     public Action<string> ManualToggled;
-    Rectangle _launchRect, _statusRect;
     /// <summary>Height the content actually needs, so the form can size itself to it.</summary>
     public int ContentHeight { get; private set; }
 
@@ -67,15 +63,6 @@ namespace NoitaOverlay {
     protected override void OnMouseClick(MouseEventArgs e) {
       base.OnMouseClick(e);
       var p = new Point(e.X - AutoScrollPosition.X, e.Y - AutoScrollPosition.Y);
-      if (_launchRect != Rectangle.Empty && _launchRect.Contains(p)) {
-        if (LaunchClicked != null) LaunchClicked();
-        return;
-      }
-      // Clicking the status bar forces an immediate re-check, rather than waiting for the tick.
-      if (_statusRect.Contains(p)) {
-        if (RefreshClicked != null) RefreshClicked();
-        return;
-      }
       foreach (var h in _hits) {
         if (h.Item1.Contains(p)) {
           if (_collapsed.Contains(h.Item2)) _collapsed.Remove(h.Item2); else _collapsed.Add(h.Item2);
@@ -161,40 +148,7 @@ namespace NoitaOverlay {
       int W = ClientSize.Width - (VerticalScroll.Visible ? SystemInformation.VerticalScrollBarWidth : 0);
       int pad = S(12), y = S(10), inner = W - pad * 2;
 
-      // ---- status line ----------------------------------------------------
-      // One row: dot, where you are, and the seed pushed out to the right.
-      int barH = S(24);
-      _statusRect = new Rectangle(pad, y, inner, barH);
-      using (var b = new SolidBrush(Palette.BgAlt)) g.FillRectangle(b, _statusRect);
-      bool live = Snap.GameRunning;
-      using (var b = new SolidBrush(live ? Palette.Live : Palette.Dimmer))
-        g.FillEllipse(b, pad + S(9), y + (barH - S(7)) / 2, S(7), S(7));
-
-      // Reserve the right hand end for either the seed or the launch button.
-      _launchRect = Rectangle.Empty;
-      int rightEdge = W - pad - S(8);
-      if (!live) {
-        const string lbl = "Launch Noita";
-        var ls = g.MeasureString(lbl, _fSmall);
-        var r = new Rectangle(rightEdge - (int)ls.Width - S(14), y + S(3),
-                              (int)ls.Width + S(14), barH - S(6));
-        _launchRect = r;
-        using (var b = new SolidBrush(Color.FromArgb(46, 52, 62))) g.FillRectangle(b, r);
-        using (var pn = new Pen(Color.FromArgb(78, 86, 100))) g.DrawRectangle(pn, r);
-        using (var b = new SolidBrush(Palette.Text))
-          g.DrawString(lbl, _fSmall, b, r.X + S(7), r.Y + S(1));
-        rightEdge = r.X - S(6);
-      } else if (Snap.Seed.Length > 0 && Snap.InRun) {
-        var seed = "seed " + Snap.Seed;
-        var ss = g.MeasureString(seed, _fSmall);
-        using (var b = new SolidBrush(Palette.Dimmer))
-          g.DrawString(seed, _fSmall, b, rightEdge - ss.Width, y + S(4));
-        rightEdge -= (int)ss.Width + S(6);
-      }
-
-      Clip(g, Status, _fStatus, live ? Palette.Text : Palette.Dim,
-           pad + S(23), y + S(3), rightEdge - pad - S(23));
-      y += barH + S(10);
+      // Status lives in the title bar now, so the board starts straight in on content.
 
       // ---- discovery toast ------------------------------------------------
       if (Toast != null && DateTime.UtcNow < ToastUntil) {
@@ -412,7 +366,10 @@ namespace NoitaOverlay {
     }
 
     bool _locked;
-    Button _lockBtn;
+    Button _lockBtn, _launchBtn;
+    Panel _bar;
+    string _status = "", _seed = "";
+    bool _live;
 
     void SetLocked(bool on) {
       _locked = on;
@@ -629,6 +586,7 @@ namespace NoitaOverlay {
       Location = loc;
 
       var bar = new Panel { Dock = DockStyle.Top, Height = barH, BackColor = Palette.BgAlt };
+      _bar = bar;
       var close  = MakeBtn("X", (int)(28 * sc), (s, e) => Close());
       _board.HideDone = true;                       // default: only show what is left
       var toggle = MakeBtn("show all", (int)(66 * sc), null);
@@ -638,18 +596,52 @@ namespace NoitaOverlay {
         toggle.Text = _board.HideDone ? "show all" : "hide done";
         _board.Invalidate();
       };
-      var title = new Label {
-        Text = "NOITA - what is left",
-        ForeColor = Palette.Dim, Font = new Font("Segoe UI", 8.25f, FontStyle.Bold),
-        Dock = DockStyle.Fill, TextAlign = ContentAlignment.MiddleLeft,
-        Padding = new Padding((int)(10 * sc), 0, 0, 0), AutoEllipsis = true
+      // The bar is the status line: dot, where you are, seed. No separate title row.
+      _launchBtn = MakeBtn("Launch Noita", (int)(88 * sc), (s, e) => LaunchNoita());
+      _launchBtn.Visible = false;
+      _launchBtn.ForeColor = Palette.Text;
+      _launchBtn.Dock = DockStyle.Right;
+
+      var fBar  = new Font("Segoe UI", 9f, FontStyle.Bold);
+      var fSeed = new Font("Segoe UI", 8.25f, FontStyle.Regular);
+      bar.Paint += (s, e) => {
+        var g = e.Graphics;
+        g.SmoothingMode = SmoothingMode.AntiAlias;
+        g.TextRenderingHint = System.Drawing.Text.TextRenderingHint.ClearTypeGridFit;
+        int right = bar.ClientSize.Width;
+        foreach (Control c in bar.Controls) if (c.Visible && c.Dock == DockStyle.Right) right -= c.Width;
+        int d = (int)(7 * sc), pad = (int)(9 * sc);
+        using (var b = new SolidBrush(_live ? Palette.Live : Palette.Dimmer))
+          g.FillEllipse(b, pad, (bar.Height - d) / 2, d, d);
+
+        var tx = pad + (int)(14 * sc);
+        float lineH = g.MeasureString("Xg", fBar).Height;     // real height, not the 96-dpi one
+        float statusW = g.MeasureString(_status, fBar).Width;
+
+        // Status gets the space first. The seed only appears if it genuinely fits.
+        if (_seed.Length > 0) {
+          var sz = g.MeasureString(_seed, fSeed);
+          if (right - tx - statusW > sz.Width + (int)(12 * sc)) {
+            using (var b = new SolidBrush(Palette.Dimmer))
+              g.DrawString(_seed, fSeed, b, right - sz.Width - (int)(6 * sc),
+                           (bar.Height - g.MeasureString("Xg", fSeed).Height) / 2);
+            right -= (int)sz.Width + (int)(10 * sc);
+          }
+        }
+        using (var b = new SolidBrush(_live ? Palette.Text : Palette.Dim))
+          g.DrawString(_status, fBar, b,
+            new RectangleF(tx, (bar.Height - lineH) / 2, Math.Max(10, right - tx), lineH * 1.2f),
+            new StringFormat(StringFormatFlags.NoWrap) { Trimming = StringTrimming.EllipsisCharacter });
       };
+      // Clicking the bar forces an immediate re-check rather than waiting for the tick.
+      bar.MouseClick += (s, e) => { if (!_dragging) Refresh_(); };
       _lockBtn = MakeBtn("lock", (int)(48 * sc), null);
       _lockBtn.Click += (s, e) => SetLocked(!_locked);
       close.Dock = DockStyle.Right; toggle.Dock = DockStyle.Right; _lockBtn.Dock = DockStyle.Right;
-      bar.Controls.Add(title); bar.Controls.Add(_lockBtn); bar.Controls.Add(toggle); bar.Controls.Add(close);
+      bar.Controls.Add(_launchBtn); bar.Controls.Add(_lockBtn);
+      bar.Controls.Add(toggle); bar.Controls.Add(close);
 
-      foreach (Control c in new Control[] { bar, title }) {
+      foreach (Control c in new Control[] { bar }) {
         c.MouseDown += (s, e) => { _dragging = true; _drag = e.Location; };
         c.MouseUp   += (s, e) => _dragging = false;
         c.MouseMove += (s, e) => {
@@ -671,8 +663,7 @@ namespace NoitaOverlay {
       SetLocked(_cfg.Locked);
       toggle.Text = _board.HideDone ? "show all" : "hide done";
       _board.PinsChanged = SavePins;
-      _board.LaunchClicked = LaunchNoita;
-      _board.RefreshClicked = Refresh_;
+      
       _board.ManualToggled = id => { _tracker.ToggleManual(id); Refresh_(); };
       LoadPins();
       BuildMenu();
@@ -712,12 +703,17 @@ namespace NoitaOverlay {
       _board.Next = Model.Recommend(s);
       _board.Side = Model.Explore(s, _board.Next == null ? null : _board.Next.GoalId);
 
-      if (_tracker.Error != null)          _board.Status = _tracker.Error;
-      else if (!s.GameRunning)             _board.Status = "Noita is not running";
-      else if (!s.InRun)                   _board.Status = "Noita is open, no run yet";
-      else if (s.CurrentPlace.Length == 0) _board.Status = "In a run";
-      else if (s.Moving)                   _board.Status = "In " + Model.PlaceName(s.CurrentPlace);
-      else                                 _board.Status = "Paused in " + Model.PlaceName(s.CurrentPlace);
+      if (_tracker.Error != null)          _status = _tracker.Error;
+      else if (!s.GameRunning)             _status = "Noita is not running";
+      else if (!s.InRun)                   _status = "Noita is open, no run yet";
+      else if (s.CurrentPlace.Length == 0) _status = "In a run";
+      else if (s.Moving)                   _status = "In " + Model.PlaceName(s.CurrentPlace);
+      else                                 _status = "Paused in " + Model.PlaceName(s.CurrentPlace);
+
+      _live = s.GameRunning;
+      _seed = (s.Seed.Length > 0 && s.InRun) ? "seed " + s.Seed : "";
+      if (_launchBtn != null && _launchBtn.Visible == s.GameRunning) _launchBtn.Visible = !s.GameRunning;
+      if (_bar != null) _bar.Invalidate();
 
       if (s.NewlyEntered != null) {
         _board.Toast = "First time: " + Model.PlaceName(s.NewlyEntered);
