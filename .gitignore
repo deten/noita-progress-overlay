@@ -17,3 +17,6 @@ dist/Shots.exe
 
 # Terminal Paste Image folder
 .cp-images/
+
+# Local drafts, not part of the project
+discord-post.txt
