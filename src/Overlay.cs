@@ -55,7 +55,7 @@ namespace NoitaOverlay {
     readonly Font _fDeed   = new Font("Segoe UI", 8.75f, FontStyle.Regular);
     readonly Font _fHint   = new Font("Segoe UI", 8.25f, FontStyle.Italic);
     readonly Font _fSmall  = new Font("Segoe UI", 8.25f, FontStyle.Regular);
-    readonly Font _fStatus = new Font("Segoe UI", 10.5f, FontStyle.Bold);
+    readonly Font _fStatus = new Font("Segoe UI", 9.5f, FontStyle.Bold);
 
     public Board() {
       DoubleBuffered = true;
@@ -161,32 +161,40 @@ namespace NoitaOverlay {
       int W = ClientSize.Width - (VerticalScroll.Visible ? SystemInformation.VerticalScrollBarWidth : 0);
       int pad = S(12), y = S(10), inner = W - pad * 2;
 
-      // ---- status banner --------------------------------------------------
-      _statusRect = new Rectangle(pad, y, inner, S(42));
+      // ---- status line ----------------------------------------------------
+      // One row: dot, where you are, and the seed pushed out to the right.
+      int barH = S(24);
+      _statusRect = new Rectangle(pad, y, inner, barH);
       using (var b = new SolidBrush(Palette.BgAlt)) g.FillRectangle(b, _statusRect);
       bool live = Snap.GameRunning;
       using (var b = new SolidBrush(live ? Palette.Live : Palette.Dimmer))
-        g.FillEllipse(b, pad + S(11), y + S(17), S(8), S(8));
-      using (var b = new SolidBrush(live ? Palette.Text : Palette.Dim))
-        g.DrawString(Status, _fStatus, b, pad + S(27), y + S(5));
-      if (Snap.Seed.Length > 0 && Snap.InRun)
-        using (var b = new SolidBrush(Palette.Dimmer))
-          g.DrawString("seed " + Snap.Seed, _fSmall, b, pad + S(27), y + S(23));
+        g.FillEllipse(b, pad + S(9), y + (barH - S(7)) / 2, S(7), S(7));
 
-      // Offer to start the game when it is not running.
+      // Reserve the right hand end for either the seed or the launch button.
       _launchRect = Rectangle.Empty;
+      int rightEdge = W - pad - S(8);
       if (!live) {
         const string lbl = "Launch Noita";
         var ls = g.MeasureString(lbl, _fSmall);
-        var r = new Rectangle(W - pad - S(10) - (int)ls.Width - S(16), y + S(9),
-                              (int)ls.Width + S(16), S(24));
+        var r = new Rectangle(rightEdge - (int)ls.Width - S(14), y + S(3),
+                              (int)ls.Width + S(14), barH - S(6));
         _launchRect = r;
         using (var b = new SolidBrush(Color.FromArgb(46, 52, 62))) g.FillRectangle(b, r);
         using (var pn = new Pen(Color.FromArgb(78, 86, 100))) g.DrawRectangle(pn, r);
         using (var b = new SolidBrush(Palette.Text))
-          g.DrawString(lbl, _fSmall, b, r.X + S(8), r.Y + S(5));
+          g.DrawString(lbl, _fSmall, b, r.X + S(7), r.Y + S(1));
+        rightEdge = r.X - S(6);
+      } else if (Snap.Seed.Length > 0 && Snap.InRun) {
+        var seed = "seed " + Snap.Seed;
+        var ss = g.MeasureString(seed, _fSmall);
+        using (var b = new SolidBrush(Palette.Dimmer))
+          g.DrawString(seed, _fSmall, b, rightEdge - ss.Width, y + S(4));
+        rightEdge -= (int)ss.Width + S(6);
       }
-      y += S(52);
+
+      Clip(g, Status, _fStatus, live ? Palette.Text : Palette.Dim,
+           pad + S(23), y + S(3), rightEdge - pad - S(23));
+      y += barH + S(10);
 
       // ---- discovery toast ------------------------------------------------
       if (Toast != null && DateTime.UtcNow < ToastUntil) {
@@ -372,12 +380,22 @@ namespace NoitaOverlay {
     }
 
     // A borderless form has no resize grip, so claim the right/bottom edges by hand.
+    // When locked, every point except the lock button reports HTTRANSPARENT, which makes
+    // Windows deliver the click to whatever is underneath. Doing it per-point rather than
+    // with WS_EX_TRANSPARENT is what keeps the unlock button reachable.
     protected override void WndProc(ref Message m) {
-      const int WM_NCHITTEST = 0x0084, HTRIGHT = 11, HTBOTTOM = 15, HTBOTTOMRIGHT = 17;
+      const int WM_NCHITTEST = 0x0084, HTTRANSPARENT = -1, HTRIGHT = 11, HTBOTTOM = 15, HTBOTTOMRIGHT = 17;
       if (m.Msg == WM_NCHITTEST) {
         base.WndProc(ref m);
         int lp = unchecked((int)m.LParam.ToInt64());
         var p = PointToClient(new Point((short)(lp & 0xFFFF), (short)((lp >> 16) & 0xFFFF)));
+
+        if (_locked) {
+          if (_lockBtn != null && LockButtonBounds().Contains(p)) return;   // keep this one live
+          m.Result = (IntPtr)HTTRANSPARENT;
+          return;
+        }
+
         int grip = 8;
         bool r = p.X >= ClientSize.Width - grip, b = p.Y >= ClientSize.Height - grip;
         if (r && b)      m.Result = (IntPtr)HTBOTTOMRIGHT;
@@ -386,6 +404,23 @@ namespace NoitaOverlay {
         return;
       }
       base.WndProc(ref m);
+    }
+
+    /// <summary>Lock button position in form client coordinates.</summary>
+    Rectangle LockButtonBounds() {
+      return RectangleToClient(_lockBtn.RectangleToScreen(_lockBtn.ClientRectangle));
+    }
+
+    bool _locked;
+    Button _lockBtn;
+
+    void SetLocked(bool on) {
+      _locked = on;
+      if (_lockBtn != null) {
+        _lockBtn.Text = on ? "locked" : "lock";
+        _lockBtn.ForeColor = on ? Palette.Live : Palette.Dim;
+      }
+      _cfg.Locked = on;
     }
 
     readonly Tracker _tracker = new Tracker();
@@ -594,7 +629,7 @@ namespace NoitaOverlay {
       Location = loc;
 
       var bar = new Panel { Dock = DockStyle.Top, Height = barH, BackColor = Palette.BgAlt };
-      var close  = MakeBtn("âœ•", (int)(28 * sc), (s, e) => Close());
+      var close  = MakeBtn("X", (int)(28 * sc), (s, e) => Close());
       _board.HideDone = true;                       // default: only show what is left
       var toggle = MakeBtn("show all", (int)(66 * sc), null);
       toggle.Click += (s, e) => {
@@ -604,13 +639,15 @@ namespace NoitaOverlay {
         _board.Invalidate();
       };
       var title = new Label {
-        Text = "NOITA  Â·  what is left",
+        Text = "NOITA - what is left",
         ForeColor = Palette.Dim, Font = new Font("Segoe UI", 8.25f, FontStyle.Bold),
         Dock = DockStyle.Fill, TextAlign = ContentAlignment.MiddleLeft,
         Padding = new Padding((int)(10 * sc), 0, 0, 0), AutoEllipsis = true
       };
-      close.Dock = DockStyle.Right; toggle.Dock = DockStyle.Right;
-      bar.Controls.Add(title); bar.Controls.Add(toggle); bar.Controls.Add(close);
+      _lockBtn = MakeBtn("lock", (int)(48 * sc), null);
+      _lockBtn.Click += (s, e) => SetLocked(!_locked);
+      close.Dock = DockStyle.Right; toggle.Dock = DockStyle.Right; _lockBtn.Dock = DockStyle.Right;
+      bar.Controls.Add(title); bar.Controls.Add(_lockBtn); bar.Controls.Add(toggle); bar.Controls.Add(close);
 
       foreach (Control c in new Control[] { bar, title }) {
         c.MouseDown += (s, e) => { _dragging = true; _drag = e.Location; };
@@ -631,6 +668,7 @@ namespace NoitaOverlay {
       _board.Compact = true;
       _board.HideDone = _cfg.HideDone;
       _board.ShowExtras = _cfg.ShowExtras;
+      SetLocked(_cfg.Locked);
       toggle.Text = _board.HideDone ? "show all" : "hide done";
       _board.PinsChanged = SavePins;
       _board.LaunchClicked = LaunchNoita;

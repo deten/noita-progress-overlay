@@ -65,13 +65,15 @@ namespace NoitaOverlay {
         using (var b = new SolidBrush(Palette.BgAlt)) g.FillRectangle(b, 0, 0, w, barH);
         using (var f = new Font("Segoe UI", 8.25f, FontStyle.Bold))
         using (var b = new SolidBrush(Palette.Dim))
-          g.DrawString("NOITA  ·  what is left", f, b, 10 * Scale, 7 * Scale);
+          g.DrawString("NOITA - what is left", f, b, 10 * Scale, 7 * Scale);
         using (var f = new Font("Segoe UI", 8f))
         using (var b = new SolidBrush(Palette.Dim)) {
+          g.DrawString("X", f, b, w - 22 * Scale, 8 * Scale);
           var lbl = hideDone ? "show all" : "hide done";
           var sz = g.MeasureString(lbl, f);
-          g.DrawString(lbl, f, b, w - sz.Width - 44 * Scale, 8 * Scale);
-          g.DrawString("X", f, b, w - 22 * Scale, 8 * Scale);
+          g.DrawString(lbl, f, b, w - sz.Width - 40 * Scale, 8 * Scale);
+          var ls = g.MeasureString("lock", f);
+          g.DrawString("lock", f, b, w - sz.Width - ls.Width - 58 * Scale, 8 * Scale);
         }
         g.DrawImage(body, 0, barH);
       }

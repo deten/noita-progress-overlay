@@ -26,6 +26,8 @@ namespace NoitaOverlay {
     public bool   HideDone     { get { return GetD("hide_done", 1) != 0; } set { Set("hide_done", value ? 1 : 0); } }
     /// <summary>Off by default: the extra wiki-ish checkbox tiers stay out of the way.</summary>
     public bool   ShowExtras   { get { return GetD("show_extras", 0) != 0; } set { Set("show_extras", value ? 1 : 0); } }
+    /// <summary>Locked: clicks pass through to the game instead of hitting the overlay.</summary>
+    public bool   Locked       { get { return GetD("locked", 0) != 0; }      set { Set("locked", value ? 1 : 0); } }
 
     static double Clamp(double v, double lo, double hi) { return v < lo ? lo : (v > hi ? hi : v); }
 
