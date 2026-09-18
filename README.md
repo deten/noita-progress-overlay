@@ -83,6 +83,15 @@ only 10 write a flag that survives the run. The board has three kinds of entry.
 | Leads | nothing detects them, you tick them yourself |
 | Extras | same, and hidden until you ask for them |
 
+**Biome effects** show under the status line, but only where the answer is certain.
+`biome_modifiers.lua` rolls a random modifier for nine main-path biomes at a 10%
+chance each, using a native engine function seeded by the world seed, and stores the
+result in no save file. Those cannot be derived, so nothing is shown for them. The
+biomes outside that roll get their effect hardcoded, so those are shown, using the
+game's own wording.
+
+![biome effect](docs/08-biome-effect.png)
+
 **Leads** are things to notice rather than tasks. They never become the
 recommended task. Example: the stone mushroom far east is a real biome, so
 visiting it is detected, but triggering it writes no flag, so that half is

@@ -148,7 +148,13 @@ namespace NoitaOverlay {
       int W = ClientSize.Width - (VerticalScroll.Visible ? SystemInformation.VerticalScrollBarWidth : 0);
       int pad = S(12), y = S(10), inner = W - pad * 2;
 
-      // Status lives in the title bar now, so the board starts straight in on content.
+      // Status lives in the title bar now. Directly under it, the biome effect, when the
+      // game hardcodes one. Rolled modifiers are unknowable, so nothing is shown for those.
+      var effect = Snap.GameRunning ? Model.Effect(Snap.CurrentBiome) : null;
+      if (effect != null) {
+        Clip(g, effect, _fHint, Palette.Dim, pad + S(2), y, inner - S(4));
+        y += S(19);
+      }
 
       // ---- discovery toast ------------------------------------------------
       if (Toast != null && DateTime.UtcNow < ToastUntil) {

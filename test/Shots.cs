@@ -14,9 +14,9 @@ namespace NoitaOverlay {
     const int Scale = 2;              // 2x for readable images
     const int LogicalWidth = 360;
 
-    static Snapshot Make(string place, string[] places, string[] flags, int orbs) {
+    static Snapshot Make(string place, string[] places, string[] flags, int orbs, string rawBiome = null) {
       var s = new Snapshot {
-        CurrentPlace = place, OrbCount = orbs,
+        CurrentPlace = place, CurrentBiome = rawBiome ?? place, OrbCount = orbs,
         GameRunning = true, InRun = true, Moving = true, Seed = "1713234715"
       };
       foreach (var p in places) s.Places.Add(p);
@@ -134,6 +134,11 @@ namespace NoitaOverlay {
 
       // 7: the opt-in extra checkbox tiers, normally hidden.
       Shot("07-extras-on.png", "Paused in a Holy Mountain", vet, false, true, true);
+
+      // 8: a biome whose effect the game hardcodes, so it can be shown for certain.
+      var hot = Make("desert", VeteranPlaces, VeteranFlags, 2, "desert");
+      hot.Places.Add("desert");
+      Shot("08-biome-effect.png", "In the Desert", hot, true, true);
     }
   }
 }

@@ -14,6 +14,7 @@ namespace NoitaOverlay {
     public bool InRun;                        // the save is being written to => actually in a run
     public bool Moving;                       // chunks written recently => actively playing
     public string CurrentPlace = "";          // canonical place key, "" if unknown
+    public string CurrentBiome = "";          // raw biome id, before collapsing; effects need the exact one
     public int    WorldX, WorldY;
     public string Seed = "";
     public string Playtime = "";
@@ -172,7 +173,8 @@ namespace NoitaOverlay {
             s.WorldX = int.Parse(m.Groups[1].Value, CultureInfo.InvariantCulture);
             s.WorldY = int.Parse(m.Groups[2].Value, CultureInfo.InvariantCulture);
             // Sample the chunk centre, not its corner.
-            s.CurrentPlace = Model.Canon(BiomeMap.At(s.WorldX + 256, s.WorldY + 256));
+            s.CurrentBiome = BiomeMap.At(s.WorldX + 256, s.WorldY + 256);
+            s.CurrentPlace = Model.Canon(s.CurrentBiome);
           }
           var age = (now - newest.LastWriteTimeUtc).TotalSeconds;
           s.Moving = age < 20;

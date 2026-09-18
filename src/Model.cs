@@ -188,6 +188,38 @@ namespace NoitaOverlay {
     /// <summary>Tiers 7 and 8 are the opt-in list. Off unless the user turns extras on.</summary>
     public static bool IsExtra(int tier) { return tier >= 7; }
 
+    /// <summary>
+    /// The biome effect, where it can be known for certain.
+    /// biome_modifiers.lua rolls a random modifier for nine main-path biomes only
+    /// (coalmine, coalmine_alt, excavationsite, fungicave, snowcave, snowcastle,
+    /// rainforest, vault, crypt), at a 10% chance each, using ProceduralRandomf. That is a
+    /// native engine function seeded by the world seed, and the result is written to no save
+    /// file, so for those biomes the effect cannot be derived and nothing is shown.
+    ///
+    /// The biomes below are outside that table, so the script's hardcoded assignment always
+    /// wins. Strings are the game's own, from common.csv.
+    /// </summary>
+    public static string Effect(string rawBiome) {
+      switch (rawBiome) {
+        case "winter":
+        case "winter_caves":
+        case "mountain_top":
+        case "mountain_floating_island":
+          return "The air feels freezing";
+        case "desert":
+        case "lavalake":
+        case "lavalake_pit":
+        case "pyramid_entrance":
+        case "pyramid_left":
+        case "pyramid_top":
+        case "pyramid_right":
+          return "The air feels dry and hot";
+        case "watercave":
+          return "The air feels extremely humid";
+      }
+      return null;
+    }
+
     /// <summary>Collapses Noita's 128 internal biome ids onto the handful of places a player thinks in.</summary>
     public static string Canon(string biome) {
       if (string.IsNullOrEmpty(biome)) return "";
