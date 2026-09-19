@@ -17,8 +17,22 @@ namespace NoitaOverlay {
     public static readonly Color Live   = Color.FromArgb(110, 198, 122);
   }
 
+  /// <summary>
+  /// A panel that can opt out of the mouse entirely. WM_NCHITTEST is answered per window,
+  /// so the form saying HTTRANSPARENT does nothing for clicks that land on a child control:
+  /// each child has to say it too, or the click stops there.
+  /// </summary>
+  internal class ClickThrough : Panel {
+    public bool Locked;
+    protected override void WndProc(ref Message m) {
+      const int WM_NCHITTEST = 0x0084, HTTRANSPARENT = -1;
+      if (Locked && m.Msg == WM_NCHITTEST) { m.Result = (IntPtr)HTTRANSPARENT; return; }
+      base.WndProc(ref m);
+    }
+  }
+
   /// <summary>Draws the tiered board. All layout happens in one pass so hit-testing stays in sync.</summary>
-  internal sealed class Board : Panel {
+  internal sealed class Board : ClickThrough {
     public Snapshot Snap = new Snapshot();
     public bool HideDone;
         public string Toast; public DateTime ToastUntil;
@@ -372,8 +386,8 @@ namespace NoitaOverlay {
     }
 
     bool _locked;
-    Button _lockBtn, _launchBtn;
-    Panel _bar;
+    Button _lockBtn, _launchBtn, _toggleBtn, _closeBtn;
+    ClickThrough _bar;
     string _status = "", _seed = "";
     bool _live;
 
@@ -383,6 +397,19 @@ namespace NoitaOverlay {
         _lockBtn.Text = on ? "locked" : "lock";
         _lockBtn.ForeColor = on ? Palette.Live : Palette.Dim;
       }
+      // Every child window has to decline the mouse for itself.
+      _board.Locked = on;
+      if (_bar != null) _bar.Locked = on;
+      // Nothing but unlocking is available while locked, so the other buttons go away.
+      foreach (var b in new[] { _toggleBtn, _closeBtn, _launchBtn })
+        if (b != null) b.Visible = on ? false : (b != _launchBtn || !_live);
+      // Collapse back to the compact view and stay there.
+      if (on) {
+        _overTicks = 0;
+        _board.Compact = true;
+        _board.Invalidate();
+      }
+      if (_bar != null) _bar.Invalidate();
       _cfg.Locked = on;
     }
 
@@ -405,9 +432,10 @@ namespace NoitaOverlay {
     int _barH;
 
     void FadeStep() {
-      bool over = Bounds.Contains(Cursor.Position) || _dragging;
+      // Locked means locked: no expanding, no brightening, just the compact strip.
+      bool over = !_locked && (Bounds.Contains(Cursor.Position) || _dragging);
       _overTicks = over ? _overTicks + 1 : 0;
-      bool open = _overTicks >= DwellTicks || _dragging;
+      bool open = !_locked && (_overTicks >= DwellTicks || _dragging);
 
       if (_board.Compact == open) {     // state flipped -- switch the view
         _board.Compact = !open;
@@ -591,11 +619,11 @@ namespace NoitaOverlay {
       }
       Location = loc;
 
-      var bar = new Panel { Dock = DockStyle.Top, Height = barH, BackColor = Palette.BgAlt };
+      var bar = new ClickThrough { Dock = DockStyle.Top, Height = barH, BackColor = Palette.BgAlt };
       _bar = bar;
-      var close  = MakeBtn("X", (int)(28 * sc), (s, e) => Close());
+      var close  = MakeBtn("X", (int)(28 * sc), (s, e) => Close());  _closeBtn = close;
       _board.HideDone = true;                       // default: only show what is left
-      var toggle = MakeBtn("show all", (int)(66 * sc), null);
+      var toggle = MakeBtn("show all", (int)(66 * sc), null);  _toggleBtn = toggle;
       toggle.Click += (s, e) => {
         _board.HideDone = !_board.HideDone;
         _cfg.HideDone = _board.HideDone;
@@ -718,7 +746,9 @@ namespace NoitaOverlay {
 
       _live = s.GameRunning;
       _seed = (s.Seed.Length > 0 && s.InRun) ? "seed " + s.Seed : "";
-      if (_launchBtn != null && _launchBtn.Visible == s.GameRunning) _launchBtn.Visible = !s.GameRunning;
+      // Nothing but the lock button is operable while locked, so do not resurrect this one.
+      bool wantLaunch = !s.GameRunning && !_locked;
+      if (_launchBtn != null && _launchBtn.Visible != wantLaunch) _launchBtn.Visible = wantLaunch;
       if (_bar != null) _bar.Invalidate();
 
       if (s.NewlyEntered != null) {
