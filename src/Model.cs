@@ -199,6 +199,53 @@ namespace NoitaOverlay {
     /// The biomes below are outside that table, so the script's hardcoded assignment always
     /// wins. Strings are the game's own, from common.csv.
     /// </summary>
+    /// <summary>
+    /// Every biome modifier the game can apply, with the exact message it shows you.
+    /// Ordered as biome_modifiers.lua declares them. Strings are the game's own, from
+    /// common.csv, so what you read on screen matches what you pick here.
+    /// </summary>
+    public static readonly string[][] Modifiers = {
+      new[]{"MOIST","The air feels extremely humid"},
+      new[]{"FOG_OF_WAR_REAPPEARS","A mysterious darkness lingers in this place"},
+      new[]{"HIGH_GRAVITY","The air feels heavy"},
+      new[]{"LOW_GRAVITY","The air feels light"},
+      new[]{"CONDUCTIVE","The air smells ionized"},
+      new[]{"HOT","The air feels dry and hot"},
+      new[]{"GOLD_VEIN","You sense lucrative opportunities"},
+      new[]{"GOLD_VEIN_SUPER","You sense extremely lucrative opportunities"},
+      new[]{"PLANT_INFESTED","It smells like soil after rain"},
+      new[]{"FURNISHED","It feels cozy in here"},
+      new[]{"BOOBY_TRAPPED","You feel wary"},
+      new[]{"PERFORATED","It feels roomy in here"},
+      new[]{"SPOOKY","The hair in the back of your neck stands up"},
+      new[]{"GRAVITY_FIELDS","Something is not right here"},
+      new[]{"FUNGAL","The air smells of mushrooms"},
+      new[]{"FLOODED","Where did all this water come from?"},
+      new[]{"GAS_FLOODED","There's a smell of gas in the air"},
+      new[]{"SHIELDED","You feel wary"},
+      new[]{"PROTECTION_FIELDS","You feel a sense of peace"},
+      new[]{"OMINOUS","A terrible chill runs down your spine"},
+      new[]{"INVISIBILITY","Something is not right here"},
+      new[]{"WORMY","The air smells of worms"},
+      new[]{"FREEZING","The air feels freezing"},
+    };
+
+    public static string ModifierText(string id) {
+      foreach (var m in Modifiers) if (m[0] == id) return m[1];
+      return id;
+    }
+
+    /// <summary>Biomes whose effect is rolled per world, so it has to be noted by hand.</summary>
+    public static bool EffectIsRolled(string rawBiome) {
+      switch (rawBiome) {
+        case "coalmine": case "mountain_hall": case "coalmine_alt": case "excavationsite":
+        case "fungicave": case "snowcave": case "snowcastle": case "rainforest":
+        case "rainforest_open": case "vault": case "crypt":
+          return true;
+      }
+      return false;
+    }
+
     public static string Effect(string rawBiome) {
       switch (rawBiome) {
         case "winter":

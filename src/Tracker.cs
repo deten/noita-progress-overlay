@@ -15,6 +15,8 @@ namespace NoitaOverlay {
     public bool Moving;                       // chunks written recently => actively playing
     public string CurrentPlace = "";          // canonical place key, "" if unknown
     public string CurrentBiome = "";          // raw biome id, before collapsing; effects need the exact one
+    public string EffectText;                 // the biome's effect, known or noted
+    public bool   EffectCanBeNoted;           // rolled here, and not noted yet
     public int    WorldX, WorldY;
     public string Seed = "";
     public string Playtime = "";
@@ -53,6 +55,7 @@ namespace NoitaOverlay {
       _historyPath = Path.Combine(dir, "history.txt");
       _manualPath  = Path.Combine(dir, "leads.txt");
       LoadHistory();
+      LoadEffects();
       try {
         if (File.Exists(_manualPath))
           foreach (var l in File.ReadAllLines(_manualPath)) {
@@ -60,6 +63,48 @@ namespace NoitaOverlay {
             if (t.Length > 0) _manual.Add(t);
           }
       } catch { }
+    }
+
+    // ---- biome effects -----------------------------------------------------
+    // The game rolls most of these per world and writes them nowhere, so once you have
+    // seen the message we keep it, keyed by seed and biome. Also a record of
+    // (seed, biome, modifier) that can be tested against later if the RNG is cracked.
+
+    readonly Dictionary<string, string> _effects = new Dictionary<string, string>();
+    string _effectsPath;
+
+    static string EffectKey(string seed, string biome) { return seed + "|" + biome; }
+
+    void LoadEffects() {
+      _effectsPath = Path.Combine(Path.GetDirectoryName(_historyPath), "effects.txt");
+      try {
+        if (!File.Exists(_effectsPath)) return;
+        foreach (var l in File.ReadAllLines(_effectsPath)) {
+          var p = l.Split('|');
+          if (p.Length == 3) _effects[EffectKey(p[0].Trim(), p[1].Trim())] = p[2].Trim();
+        }
+      } catch { }
+    }
+
+    /// <summary>Record what the game told you on entering this biome, for this world.</summary>
+    public void NoteEffect(string seed, string biome, string modifierId) {
+      if (string.IsNullOrEmpty(seed) || string.IsNullOrEmpty(biome)) return;
+      if (modifierId == null) _effects.Remove(EffectKey(seed, biome));
+      else _effects[EffectKey(seed, biome)] = modifierId;
+      try {
+        var lines = new List<string>();
+        foreach (var kv in _effects) {
+          var p = kv.Key.Split('|');
+          lines.Add(p[0] + " | " + p[1] + " | " + kv.Value);
+        }
+        lines.Sort();
+        File.WriteAllLines(_effectsPath, lines.ToArray());
+      } catch { }
+    }
+
+    public string NotedEffect(string seed, string biome) {
+      string v;
+      return _effects.TryGetValue(EffectKey(seed, biome), out v) ? v : null;
     }
 
     /// <summary>Tick a lead off, or un-tick it. Nothing in the game records these.</summary>
@@ -230,6 +275,14 @@ namespace NoitaOverlay {
 
         s.Places = new HashSet<string>(_history);
         s.Manual = new HashSet<string>(_manual);
+
+        // Hardcoded effects are certain. Otherwise use whatever you noted for this world.
+        s.EffectText = Model.Effect(s.CurrentBiome);
+        if (s.EffectText == null && s.CurrentBiome.Length > 0) {
+          var noted = NotedEffect(s.Seed, s.CurrentBiome);
+          if (noted != null) s.EffectText = Model.ModifierText(noted);
+          else s.EffectCanBeNoted = Model.EffectIsRolled(s.CurrentBiome) && s.Seed.Length > 0;
+        }
       } catch (Exception ex) {
         Error = ex.Message;
       }

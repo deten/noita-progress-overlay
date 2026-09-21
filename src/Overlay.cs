@@ -164,9 +164,12 @@ namespace NoitaOverlay {
 
       // Status lives in the title bar now. Directly under it, the biome effect, when the
       // game hardcodes one. Rolled modifiers are unknowable, so nothing is shown for those.
-      var effect = Snap.GameRunning ? Model.Effect(Snap.CurrentBiome) : null;
-      if (effect != null) {
-        Clip(g, effect, _fHint, Palette.Dim, pad + S(2), y, inner - S(4));
+      if (Snap.GameRunning && Snap.EffectText != null) {
+        Clip(g, Snap.EffectText, _fHint, Palette.Dim, pad + S(2), y, inner - S(4));
+        y += S(19);
+      } else if (Snap.GameRunning && Snap.EffectCanBeNoted) {
+        Clip(g, "effect not noted here, right click to set", _fHint,
+             Color.FromArgb(78, 83, 93), pad + S(2), y, inner - S(4));
         y += S(19);
       }
 
@@ -484,6 +487,35 @@ namespace NoitaOverlay {
       menu.Items.Add(idle);
       menu.Items.Add(hover);
       menu.Items.Add(dwell);
+      // Note what the game told you on entering this biome. Kept per world, so it comes
+      // back every time you return, and it is a real record for checking the RNG later.
+      var effect = new ToolStripMenuItem("Effect here");
+      foreach (var m in Model.Modifiers) {
+        string id = m[0], text = m[1];
+        effect.DropDownItems.Add(new ToolStripMenuItem(text, null, (s, e) => {
+          var sn = _board.Snap;
+          _tracker.NoteEffect(sn.Seed, sn.CurrentBiome, id);
+          Refresh_();
+        }));
+      }
+      effect.DropDownItems.Add(new ToolStripSeparator());
+      effect.DropDownItems.Add(new ToolStripMenuItem("(none / clear)", null, (s, e) => {
+        var sn = _board.Snap;
+        _tracker.NoteEffect(sn.Seed, sn.CurrentBiome, null);
+        Refresh_();
+      }));
+      // Only meaningful while you are standing somewhere whose effect is rolled.
+      effect.DropDownOpening += (s, e) => { };
+      menu.Opening += (s, e) => {
+        var sn = _board.Snap;
+        bool rolled = sn.GameRunning && sn.Seed.Length > 0 && Model.EffectIsRolled(sn.CurrentBiome);
+        effect.Enabled = rolled;
+        effect.Text = rolled
+          ? "Effect here (" + Model.PlaceName(sn.CurrentPlace) + ")"
+          : "Effect here (not applicable)";
+      };
+      menu.Items.Add(effect);
+
       menu.Items.Add(new ToolStripSeparator());
       var extras = new ToolStripMenuItem("Add other items");
       extras.ToolTipText = "Extra checkbox lists. Nothing detects these, you tick them yourself.";
