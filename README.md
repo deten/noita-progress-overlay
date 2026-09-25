@@ -95,11 +95,12 @@ zone. The game rolls them when the world is made and saves the result nowhere, b
 the roll is deterministic: the world seed plus a fixed position, through Noita's
 procedural RNG. The overlay repeats that roll.
 
-It is checked three ways:
+It is checked four ways:
 
 - the RNG matches 12 published test values
 - the full roll matches noitool's published answer for seed 123
-- it predicts "You feel wary" in the Coal Pits for a real run where the game said so
+- it predicted "You feel wary" in the Coal Pits for a real run where the game said so
+- it predicted "The air feels heavy" in the Snowy Depths before the player got there, and the game said so
 
 If the game ever shows something different, right click and pick
 **Correct the effect here**. The correction wins for that world.

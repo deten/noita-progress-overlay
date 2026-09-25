@@ -41,6 +41,15 @@ namespace NoitaOverlay {
              m1.TryGetValue("excavationsite", out ex) && ex.Id == "BOOBY_TRAPPED");
 
       Console.WriteLine();
+
+      // 3. Predicted before it was seen: "The air feels heavy" (HIGH_GRAVITY) on entering the
+      //    Snowy Depths, seed 1584486744, 56 lifetime deaths at the time.
+      var m2 = BiomeModifiers.For(1584486744, 56, noFlags);
+      Modifier sc;
+      Expect("seed 1584486744 puts HIGH_GRAVITY on the Snowy Depths (predicted, then seen in game)",
+             m2.TryGetValue("snowcave", out sc) && sc.Id == "HIGH_GRAVITY");
+
+      Console.WriteLine();
       Console.WriteLine(fails == 0 ? "ALL PASS" : fails + " FAILED");
       Environment.ExitCode = fails;
     }
