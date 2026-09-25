@@ -1,19 +1,13 @@
 # Extracted Noita game files. These belong to Nolla Games. Never commit them.
 gamedata/
 
+# Build output. Only the overlay itself is shipped; test harness binaries stay local.
+dist/*
+!dist/NoitaOverlay.exe
+
 # Build scratch
 *.pdb
 probe/probe_log.txt
-
-# Screenshots are generated into docs/, everything else is scratch
-dist/*.png
-!docs/*.png
-
-# Test harness binaries. Only the overlay itself is shipped.
-dist/Probe.exe
-dist/Simulate.exe
-dist/Preview.exe
-dist/Shots.exe
 
 # Local drafts, not part of the project
 discord-post.txt

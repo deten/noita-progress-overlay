@@ -35,7 +35,7 @@ namespace NoitaOverlay {
   internal sealed class Board : ClickThrough {
     public Snapshot Snap = new Snapshot();
     public bool HideDone;
-        public string Toast; public DateTime ToastUntil;
+    public string Toast; public DateTime ToastUntil;
 
     public bool Compact;                                  // idle: just the next task + pins
     public bool ShowExtras;                               // opt-in wiki-ish checkbox tiers
@@ -88,8 +88,9 @@ namespace NoitaOverlay {
         if (!h.Item1.Contains(p)) continue;
         var goal = Model.Goals.FirstOrDefault(x => x.Id == h.Item2);
         // Leads have nothing to detect, so clicking one ticks it off instead of pinning it.
-        if (goal != null && goal.Source == Source.Manual) {
-          if (ManualToggled != null) ManualToggled(goal.Key);
+        // Run-flag goals can be ticked by hand too, for things done before the overlay watched.
+        if (goal != null && (goal.Source == Source.Manual || goal.Source == Source.RunFlag)) {
+          if (ManualToggled != null) ManualToggled(goal.Source == Source.Manual ? goal.Key : goal.Id);
         } else {
           if (Pinned.Contains(h.Item2)) Pinned.Remove(h.Item2); else Pinned.Add(h.Item2);
           if (PinsChanged != null) PinsChanged();
@@ -162,14 +163,10 @@ namespace NoitaOverlay {
       int W = ClientSize.Width - (VerticalScroll.Visible ? SystemInformation.VerticalScrollBarWidth : 0);
       int pad = S(12), y = S(10), inner = W - pad * 2;
 
-      // Status lives in the title bar now. Directly under it, the biome effect, when the
-      // game hardcodes one. Rolled modifiers are unknowable, so nothing is shown for those.
+      // Status lives in the title bar. Directly under it, this biome's effect in this world,
+      // worked out from the seed, so it stays up for as long as you are in the zone.
       if (Snap.GameRunning && Snap.EffectText != null) {
         Clip(g, Snap.EffectText, _fHint, Palette.Dim, pad + S(2), y, inner - S(4));
-        y += S(19);
-      } else if (Snap.GameRunning && Snap.EffectCanBeNoted) {
-        Clip(g, "effect not noted here, right click to set", _fHint,
-             Color.FromArgb(78, 83, 93), pad + S(2), y, inner - S(4));
         y += S(19);
       }
 
@@ -487,32 +484,43 @@ namespace NoitaOverlay {
       menu.Items.Add(idle);
       menu.Items.Add(hover);
       menu.Items.Add(dwell);
-      // Note what the game told you on entering this biome. Kept per world, so it comes
-      // back every time you return, and it is a real record for checking the RNG later.
-      var effect = new ToolStripMenuItem("Effect here");
-      foreach (var m in Model.Modifiers) {
-        string id = m[0], text = m[1];
-        effect.DropDownItems.Add(new ToolStripMenuItem(text, null, (s, e) => {
+      // Effects are predicted from the seed. If the game ever shows something different, this
+      // overrides the prediction for that world and biome, and effects.txt records the miss.
+      var effect = new ToolStripMenuItem("Correct the effect here");
+      foreach (var m in Modifiers.All) {
+        if (!m.InWeightedTable || m.Probability <= 0) continue;     // only ones a roll can give
+        string id = m.Id;
+        effect.DropDownItems.Add(new ToolStripMenuItem(m.Text, null, (s, e) => {
           var sn = _board.Snap;
-          _tracker.NoteEffect(sn.Seed, sn.CurrentBiome, id);
+          _tracker.CorrectEffect(sn.Seed, sn.CurrentBiome, id);
           Refresh_();
-        }));
+        }) { Tag = id });
       }
       effect.DropDownItems.Add(new ToolStripSeparator());
-      effect.DropDownItems.Add(new ToolStripMenuItem("(none / clear)", null, (s, e) => {
+      effect.DropDownItems.Add(new ToolStripMenuItem("There is no effect here", null, (s, e) => {
         var sn = _board.Snap;
-        _tracker.NoteEffect(sn.Seed, sn.CurrentBiome, null);
+        _tracker.CorrectEffect(sn.Seed, sn.CurrentBiome, "NONE");
+        Refresh_();
+      }) { Tag = "NONE" });
+      effect.DropDownItems.Add(new ToolStripMenuItem("Use the prediction", null, (s, e) => {
+        var sn = _board.Snap;
+        _tracker.CorrectEffect(sn.Seed, sn.CurrentBiome, null);
         Refresh_();
       }));
-      // Only meaningful while you are standing somewhere whose effect is rolled.
-      effect.DropDownOpening += (s, e) => { };
       menu.Opening += (s, e) => {
         var sn = _board.Snap;
-        bool rolled = sn.GameRunning && sn.Seed.Length > 0 && Model.EffectIsRolled(sn.CurrentBiome);
-        effect.Enabled = rolled;
-        effect.Text = rolled
-          ? "Effect here (" + Model.PlaceName(sn.CurrentPlace) + ")"
-          : "Effect here (not applicable)";
+        bool ok = sn.GameRunning && sn.Seed.Length > 0 && sn.CurrentBiome.Length > 0;
+        effect.Enabled = ok;
+        effect.Text = ok ? "Correct the effect here (" + Model.PlaceName(sn.CurrentPlace) + ")"
+                         : "Correct the effect here (needs a run in progress)";
+        // Tick whatever is currently in force, so it is clear what you would be changing.
+        string current = ok ? (_tracker.Correction(sn.Seed, sn.CurrentBiome)
+                               ?? (_tracker.Predicted(sn.CurrentBiome) != null ? _tracker.Predicted(sn.CurrentBiome).Id : "NONE"))
+                            : null;
+        foreach (ToolStripItem it in effect.DropDownItems) {
+          var mi = it as ToolStripMenuItem;
+          if (mi != null && mi.Tag != null) mi.Checked = (string)mi.Tag == current;
+        }
       };
       menu.Items.Add(effect);
 
@@ -552,8 +560,11 @@ namespace NoitaOverlay {
         foreach (ToolStripItem child in parent.DropDownItems) {
           var mi = child as ToolStripMenuItem;
           if (mi == null || mi.Tag == null) continue;
+          // Only the preset items use "name:value" tags. Other menus tag their items too
+          // (the effect list uses modifier ids), so leave anything that is not ours alone.
           var parts = mi.Tag.ToString().Split(':');
-          int v = int.Parse(parts[1]);
+          int v;
+          if (parts.Length != 2 || !int.TryParse(parts[1], out v)) continue;
           if (parts[0] == "idle")  mi.Checked = Math.Abs(_cfg.IdleOpacity  * 100 - v) < 0.5;
           if (parts[0] == "hover") mi.Checked = Math.Abs(_cfg.HoverOpacity * 100 - v) < 0.5;
           if (parts[0] == "dwell") mi.Checked = _cfg.DwellMs == v;
@@ -792,9 +803,23 @@ namespace NoitaOverlay {
 
     [STAThread]
     static void Main() {
+      // If anything ever goes wrong, leave a stack trace behind instead of vanishing silently.
+      Application.SetUnhandledExceptionMode(UnhandledExceptionMode.CatchException);
+      Application.ThreadException += (s, e) => LogCrash(e.Exception);
+      AppDomain.CurrentDomain.UnhandledException += (s, e) => LogCrash(e.ExceptionObject as Exception);
+
       Application.EnableVisualStyles();
       Application.SetCompatibleTextRenderingDefault(false);
       Application.Run(new OverlayForm());
+    }
+
+    static void LogCrash(Exception ex) {
+      try {
+        var path = Path.Combine(Settings.Dir, "crash.log");
+        File.AppendAllText(path, DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss") + Environment.NewLine +
+                                 (ex == null ? "(no exception object)" : ex.ToString()) +
+                                 Environment.NewLine + Environment.NewLine);
+      } catch { }
     }
   }
 }

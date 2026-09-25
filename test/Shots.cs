@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Drawing;
 using System.Drawing.Drawing2D;
 using System.IO;
@@ -14,13 +14,19 @@ namespace NoitaOverlay {
     const int Scale = 2;              // 2x for readable images
     const int LogicalWidth = 360;
 
-    static Snapshot Make(string place, string[] places, string[] flags, int orbs, string rawBiome = null) {
+    // The world where "You feel wary" was seen in the Coal Pits, so effect shots are real ones.
+    const uint DemoSeed = 1184881785;
+
+    static Snapshot Make(string place, string[] places, string[] flags, int orbs, string rawBiome = null, int deaths = 1000) {
       var s = new Snapshot {
         CurrentPlace = place, CurrentBiome = rawBiome ?? place, OrbCount = orbs,
-        GameRunning = true, InRun = true, Moving = true, Seed = "1713234715"
+        GameRunning = true, InRun = true, Moving = true, Seed = DemoSeed.ToString()
       };
       foreach (var p in places) s.Places.Add(p);
       foreach (var f in flags) s.Flags.Add(f);
+      // Same computation the tracker does, so the effect line matches the real overlay.
+      Modifier m;
+      if (BiomeModifiers.For(DemoSeed, deaths, s.Flags).TryGetValue(s.CurrentBiome, out m)) s.EffectText = m.Text;
       return s;
     }
 
@@ -74,6 +80,14 @@ namespace NoitaOverlay {
           var ls = g.MeasureString("lock", f);
           g.DrawString("lock", f, b, right - ls.Width - 6 * Scale, 8 * Scale);
           right -= (int)ls.Width + 14 * Scale;
+          if (!snap.GameRunning) {
+            // The real bar shows a Launch button here while the game is closed.
+            var lz = g.MeasureString("Launch Noita", f);
+            var r = new Rectangle(right - (int)lz.Width - 16 * Scale, 5 * Scale, (int)lz.Width + 12 * Scale, barH - 10 * Scale);
+            using (var bb = new SolidBrush(Color.FromArgb(46, 52, 62))) g.FillRectangle(bb, r);
+            using (var tb = new SolidBrush(Palette.Text)) g.DrawString("Launch Noita", f, tb, r.X + 6 * Scale, r.Y + 3 * Scale);
+            right = r.X - 6 * Scale;
+          }
         }
         int d = 7 * Scale, lpad = 9 * Scale, tx = lpad + 14 * Scale;
         using (var b = new SolidBrush(snap.GameRunning ? Palette.Live : Palette.Dimmer))
@@ -113,13 +127,13 @@ namespace NoitaOverlay {
       Application.EnableVisualStyles();
 
       // 1 and 2: brand new player, first ever run.
-      var fresh = Make("coalmine", new[] { "surface", "coalmine" }, new string[0], 0);
+      var fresh = Make("coalmine", new[] { "surface", "coalmine" }, new string[0], 0, null, 0);
       Shot("01-new-idle.png",     "In the Mines", fresh, true,  true);
       Shot("02-new-expanded.png", "In the Mines", fresh, false, true);
 
       // 3: partway in, Detours has unlocked.
       var mid = Make("excavationsite",
-        new[] { "surface", "coalmine", "holymountain", "excavationsite" }, new string[0], 0);
+        new[] { "surface", "coalmine", "holymountain", "excavationsite" }, new string[0], 0, null, 2);
       Shot("03-detours-unlocked.png", "In the Coal Pits", mid, false, true);
 
       // 4 and 5: a player who has finished the game.
@@ -135,10 +149,10 @@ namespace NoitaOverlay {
       // 7: the opt-in extra checkbox tiers, normally hidden.
       Shot("07-extras-on.png", "Paused in a Holy Mountain", vet, false, true, true);
 
-      // 8: a biome whose effect the game hardcodes, so it can be shown for certain.
-      var hot = Make("desert", VeteranPlaces, VeteranFlags, 2, "desert");
-      hot.Places.Add("desert");
-      Shot("08-biome-effect.png", "In the Desert", hot, true, true);
+      // 8: a rolled biome effect, predicted from the seed. This is the world and biome where
+      //    the game really did say "You feel wary".
+      var wary = Make("excavationsite", VeteranPlaces, VeteranFlags, 2, "excavationsite");
+      Shot("08-biome-effect.png", "In the Coal Pits", wary, true, true);
     }
   }
 }

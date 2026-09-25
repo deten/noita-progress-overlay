@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 
 namespace NoitaOverlay {
@@ -7,7 +7,7 @@ namespace NoitaOverlay {
   /// How a goal decides it is complete. Manual is for things the game does not record:
   /// the sun chain, for example, writes no flag until its final step.
   /// </summary>
-  internal enum Source { Place, Flag, OrbCount, Manual }
+  internal enum Source { Place, Flag, OrbCount, Manual, RunFlag }
 
   /// <summary>
   /// Something you can actually accomplish at a place, as opposed to merely standing in it.
@@ -182,89 +182,16 @@ namespace NoitaOverlay {
       // Hidden unless you turn extras on. Split on whether the game records anything at all,
       // because the second list could become automatic later and the first never can.
       new TierDef(7, "Unrecorded",   "the game keeps no record of these",        0x88, 0x8E, 0x9A),
-      new TierDef(8, "Per run only", "the game notes these, then forgets",       0x6F, 0x9A, 0x90),
+      new TierDef(8, "Per run only", "noted during a run, picked up at each autosave", 0x6F, 0x9A, 0x90),
     };
 
     /// <summary>Tiers 7 and 8 are the opt-in list. Off unless the user turns extras on.</summary>
     public static bool IsExtra(int tier) { return tier >= 7; }
 
-    /// <summary>
-    /// The biome effect, where it can be known for certain.
-    /// biome_modifiers.lua rolls a random modifier for nine main-path biomes only
-    /// (coalmine, coalmine_alt, excavationsite, fungicave, snowcave, snowcastle,
-    /// rainforest, vault, crypt), at a 10% chance each, using ProceduralRandomf. That is a
-    /// native engine function seeded by the world seed, and the result is written to no save
-    /// file, so for those biomes the effect cannot be derived and nothing is shown.
-    ///
-    /// The biomes below are outside that table, so the script's hardcoded assignment always
-    /// wins. Strings are the game's own, from common.csv.
-    /// </summary>
-    /// <summary>
-    /// Every biome modifier the game can apply, with the exact message it shows you.
-    /// Ordered as biome_modifiers.lua declares them. Strings are the game's own, from
-    /// common.csv, so what you read on screen matches what you pick here.
-    /// </summary>
-    public static readonly string[][] Modifiers = {
-      new[]{"MOIST","The air feels extremely humid"},
-      new[]{"FOG_OF_WAR_REAPPEARS","A mysterious darkness lingers in this place"},
-      new[]{"HIGH_GRAVITY","The air feels heavy"},
-      new[]{"LOW_GRAVITY","The air feels light"},
-      new[]{"CONDUCTIVE","The air smells ionized"},
-      new[]{"HOT","The air feels dry and hot"},
-      new[]{"GOLD_VEIN","You sense lucrative opportunities"},
-      new[]{"GOLD_VEIN_SUPER","You sense extremely lucrative opportunities"},
-      new[]{"PLANT_INFESTED","It smells like soil after rain"},
-      new[]{"FURNISHED","It feels cozy in here"},
-      new[]{"BOOBY_TRAPPED","You feel wary"},
-      new[]{"PERFORATED","It feels roomy in here"},
-      new[]{"SPOOKY","The hair in the back of your neck stands up"},
-      new[]{"GRAVITY_FIELDS","Something is not right here"},
-      new[]{"FUNGAL","The air smells of mushrooms"},
-      new[]{"FLOODED","Where did all this water come from?"},
-      new[]{"GAS_FLOODED","There's a smell of gas in the air"},
-      new[]{"SHIELDED","You feel wary"},
-      new[]{"PROTECTION_FIELDS","You feel a sense of peace"},
-      new[]{"OMINOUS","A terrible chill runs down your spine"},
-      new[]{"INVISIBILITY","Something is not right here"},
-      new[]{"WORMY","The air smells of worms"},
-      new[]{"FREEZING","The air feels freezing"},
-    };
-
+    /// <summary>The game's own message for a modifier id (see the generated Modifiers.cs).</summary>
     public static string ModifierText(string id) {
-      foreach (var m in Modifiers) if (m[0] == id) return m[1];
+      foreach (var m in Modifiers.All) if (m.Id == id) return m.Text;
       return id;
-    }
-
-    /// <summary>Biomes whose effect is rolled per world, so it has to be noted by hand.</summary>
-    public static bool EffectIsRolled(string rawBiome) {
-      switch (rawBiome) {
-        case "coalmine": case "mountain_hall": case "coalmine_alt": case "excavationsite":
-        case "fungicave": case "snowcave": case "snowcastle": case "rainforest":
-        case "rainforest_open": case "vault": case "crypt":
-          return true;
-      }
-      return false;
-    }
-
-    public static string Effect(string rawBiome) {
-      switch (rawBiome) {
-        case "winter":
-        case "winter_caves":
-        case "mountain_top":
-        case "mountain_floating_island":
-          return "The air feels freezing";
-        case "desert":
-        case "lavalake":
-        case "lavalake_pit":
-        case "pyramid_entrance":
-        case "pyramid_left":
-        case "pyramid_top":
-        case "pyramid_right":
-          return "The air feels dry and hot";
-        case "watercave":
-          return "The air feels extremely humid";
-      }
-      return null;
     }
 
     /// <summary>Collapses Noita's 128 internal biome ids onto the handful of places a player thinks in.</summary>
@@ -476,17 +403,17 @@ namespace NoitaOverlay {
       new Goal(7, "x_gate",     "Open the wizard cave gate",       "It is shut for a reason.",                    Source.Manual, "x_gate"),
 
       // ---- 8. Per run only (opt-in) ---------------------------------------
-      // These DO get recorded, but with GameAddFlagRun: they live in world_state.xml,
-      // are wiped on a new run, and only land on disk when you quit. Manual for now;
-      // could be harvested automatically at end of run later.
-      new Goal(8, "r_kantele",  "Play a kantele song",             "It has four tunes. One is not like the others.", Source.Manual, "r_kantele"),
-      new Goal(8, "r_ocarina",  "Play an ocarina song",            "Same four tunes, different instrument.",      Source.Manual, "r_ocarina"),
-      new Goal(8, "r_alchemy",  "Play the one that changes things","Both instruments know it.",                   Source.Manual, "r_alchemy"),
-      new Goal(8, "r_music",    "Set the music machines going",    "There are four of them.",                     Source.Manual, "r_music"),
-      new Goal(8, "r_hands",    "Deal with the statue hands",      "Three of them.",                              Source.Manual, "r_hands"),
-      new Goal(8, "r_gold",     "Make the gold explode",           "Greed has a physical form.",                  Source.Manual, "r_gold"),
-      new Goal(8, "r_fishing",  "Visit both fishing huts",         "Far out, on either side.",                    Source.Manual, "r_fishing"),
-      new Goal(8, "r_greed",    "Take the greed curse, then lose it","Both halves count.",                        Source.Manual, "r_greed"),
+      // Recorded with GameAddFlagRun, so they live in the world state and are wiped by a new
+      // run. The overlay reads them from the compressed autosave every few minutes and keeps
+      // its own lifetime record. They can still be ticked by hand for anything done before.
+      new Goal(8, "r_kantele",  "Play a kantele song",             "It has four tunes. One is not like the others.", Source.RunFlag, "any:kantele_secret_00,kantele_secret_01,kantele_secret_02"),
+      new Goal(8, "r_ocarina",  "Play an ocarina song",            "Same four tunes, different instrument.",      Source.RunFlag, "any:ocarina_secret_00,ocarina_secret_01,ocarina_secret_02"),
+      new Goal(8, "r_alchemy",  "Play the one that changes things","Both instruments know it.",                   Source.RunFlag, "any:alchemy_kantele,alchemy_ocarina"),
+      new Goal(8, "r_music",    "Set the music machines going",    "There are four of them.",                     Source.RunFlag, "any:musicmachine1,musicmachine2,musicmachine3,musicmachine4"),
+      new Goal(8, "r_hands",    "Deal with the statue hands",      "Three of them.",                              Source.RunFlag, "any:statue_hands_destroyed_1,statue_hands_destroyed_2,statue_hands_destroyed_3"),
+      new Goal(8, "r_gold",     "Make the gold explode",           "Greed has a physical form.",                  Source.RunFlag, "any:exploding_gold"),
+      new Goal(8, "r_fishing",  "Visit both fishing huts",         "Far out, on either side.",                    Source.RunFlag, "all:fishing_hut_a,fishing_hut_b"),
+      new Goal(8, "r_greed",    "Take the greed curse, then lose it","Both halves count.",                        Source.RunFlag, "all:greed_curse,greed_curse_gone"),
     };
   }
 }

@@ -9,8 +9,10 @@ Not a mod, its an overlay and can also be used as a launcher, Steam achievements
 
 - Reads Noita's own save files to see where you are and what you have done
 - Shows one recommended task while you play
+- Shows the current biome's effect, worked out from the world seed
 - Expands to the full board when you mouse over it
 - Fades to 28% opacity when you are not looking at it
+- Lock button makes it click-through, so it never gets in the way of the game
 
 ## Screenshots
 
@@ -47,8 +49,12 @@ It only reads files Noita already writes:
 | Source | Used for |
 | --- | --- |
 | `save00/world/world_<x>_<y>.png_petri` | live position, updates every 1 to 2 seconds |
-| `save00/persistent/flags/` | lifetime progress, one file per flag |
-| `save00/stats/sessions/*_stats.xml` | run summary, written when you quit |
+| `save00/persistent/flags/` | lifetime progress, written the moment you earn it |
+| `save00/world/.autosave`, `.stream_info` | the world seed |
+| `save00/world/.autosave_world_state` | per-run flags, rewritten every few minutes |
+| `save00/stats/sessions/*_stats.xml` | run summary and death count, written when you quit |
+
+The `.autosave` files are FastLZ compressed. The overlay decompresses them itself.
 
 Biome lookup is a static table baked into the exe at build time. It comes from
 `biome_map.png` inside the game's `data.wak`. World layout is fixed, not seed
@@ -83,12 +89,19 @@ only 10 write a flag that survives the run. The board has three kinds of entry.
 | Leads | nothing detects them, you tick them yourself |
 | Extras | same, and hidden until you ask for them |
 
-**Biome effects** show under the status line, but only where the answer is certain.
-`biome_modifiers.lua` rolls a random modifier for nine main-path biomes at a 10%
-chance each, using a native engine function seeded by the world seed, and stores the
-result in no save file. Those cannot be derived, so nothing is shown for them. The
-biomes outside that roll get their effect hardcoded, so those are shown, using the
-game's own wording.
+**Biome effects** show under the status line and stay up while you are in the
+zone. The game rolls them when the world is made and saves the result nowhere, but
+the roll is deterministic: the world seed plus a fixed position, through Noita's
+procedural RNG. The overlay repeats that roll.
+
+It is checked three ways:
+
+- the RNG matches 12 published test values
+- the full roll matches noitool's published answer for seed 123
+- it predicts "You feel wary" in the Coal Pits for a real run where the game said so
+
+If the game ever shows something different, right click and pick
+**Correct the effect here**. The correction wins for that world.
 
 ![biome effect](docs/08-biome-effect.png)
 
@@ -102,11 +115,12 @@ a lead.
 
 - **Unrecorded** the game never writes these down, in any form. They can
   never be automatic.
-- **Per run only** the game does record these, with a run flag that is wiped
-  when the run ends. These could become automatic later.
+- **Per run only** the game records these with a run flag that is wiped when
+  the run ends. The overlay reads them from the autosave and keeps its own record,
+  so these tick themselves.
 
-Click any lead or extra to tick it off. Clicking a normal goal pins it instead,
-since there is nothing to tick on something already tracked.
+Click any lead or extra to tick it off by hand. Clicking a normal goal pins it
+instead, since there is nothing to tick on something already tracked.
 
 ## Build
 
@@ -116,19 +130,27 @@ Needs nothing installed. Uses the .NET Framework compiler built into Windows.
 powershell -File build.ps1
 ```
 
-Output is `dist/NoitaOverlay.exe`, about 75 KB.
+Output is `dist/NoitaOverlay.exe`, about 95 KB.
 
-To regenerate the biome table you need Noita installed:
+Run the tests:
+
+```
+powershell -File test/run_tests.ps1
+```
+
+Two source files are generated from the game's own data, so the text and numbers
+match exactly. To regenerate them you need Noita installed:
 
 ```
 powershell -File tools/wak_extract.ps1
 powershell -File tools/gen_biomemap.ps1
+powershell -File tools/gen_modifiers.ps1
 ```
 
 ## Settings
 
-Right click the overlay for transparency, expand delay, and the extra lists.
-Settings live in `%APPDATA%\NoitaOverlay\settings.ini`.
+Right click the overlay for transparency, expand delay, the extra lists, and
+effect corrections. Settings live in `%APPDATA%\NoitaOverlay\settings.ini`.
 
 | Setting | Default |
 | --- | --- |
@@ -136,12 +158,15 @@ Settings live in `%APPDATA%\NoitaOverlay\settings.ini`.
 | `hover_opacity` | 0.97 |
 | `dwell_ms` | 200, delay before it expands |
 | `show_extras` | 0, the two extra lists are hidden |
+| `locked` | 0, set by the lock button |
 
 Other files there:
 
 - `history.txt` places you have visited
 - `pinned.txt` goals you pinned
 - `leads.txt` leads and extras you ticked off
+- `runflags.txt` per-run flags seen across all your runs
+- `effects.txt` any biome effect corrections you made
 
 ## Notes
 
