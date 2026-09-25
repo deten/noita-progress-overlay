@@ -87,8 +87,10 @@ only 10 write a flag that survives the run. The board has three kinds of entry.
 | Kind | How it is checked |
 | --- | --- |
 | Places and flags | detected automatically, live |
+| Biome effects | worked out from the world seed |
 | Leads | nothing detects them, you tick them yourself |
-| Extras | same, and hidden until you ask for them |
+| Extras, Unrecorded | same as leads, hidden until you ask for them |
+| Extras, Per run only | read from the autosave, hidden until you ask for them |
 
 **Biome effects** show under the status line and stay up while you are in the
 zone. The game rolls them when the world is made and saves the result nowhere, but
@@ -124,6 +126,19 @@ a lead.
 Click any lead or extra to tick it off by hand. Clicking a normal goal pins it
 instead, since there is nothing to tick on something already tracked.
 
+## Lock
+
+Click **lock** in the title bar to make the overlay click-through. Mouse movement
+and clicks go straight to Noita, so it never gets in the way of aiming. It stays
+visible and keeps updating.
+
+While locked the whole window ignores the mouse, lock button included. To unlock:
+
+- press **Ctrl+Shift+L**, which works while Noita has focus
+- or right click the tray icon near the clock
+
+The tray icon can also close the overlay.
+
 ## Build
 
 Needs nothing installed. Uses the .NET Framework compiler built into Windows.
@@ -132,7 +147,7 @@ Needs nothing installed. Uses the .NET Framework compiler built into Windows.
 powershell -File build.ps1
 ```
 
-Output is `dist/NoitaOverlay.exe`, about 95 KB.
+Output is `dist/NoitaOverlay.exe`, under 100 KB.
 
 Run the tests:
 
@@ -162,10 +177,6 @@ effect corrections. Settings live in `%APPDATA%\NoitaOverlay\settings.ini`.
 | `show_extras` | 0, the two extra lists are hidden |
 | `locked` | 0, set by the lock button or Ctrl+Shift+L |
 
-While locked the whole window ignores the mouse, lock button included. Unlock with
-**Ctrl+Shift+L**, which works while Noita has focus, or right click the tray icon.
-The tray icon can also close the overlay.
-
 Other files there:
 
 - `history.txt` places you have visited
@@ -173,6 +184,7 @@ Other files there:
 - `leads.txt` leads and extras you ticked off
 - `runflags.txt` per-run flags seen across all your runs
 - `effects.txt` any biome effect corrections you made
+- `crash.log` only appears if something goes wrong
 
 ## Notes
 
@@ -183,3 +195,10 @@ Other files there:
 ## Credits
 
 Noita is by Nolla Games. This tool ships no game files.
+
+The procedural RNG is reimplemented from these MIT licensed projects:
+
+- [noitool](https://github.com/TwoAbove/noita-tools) by TwoAbove, which also
+  published the test values used to check it
+- [noitaWandAtlas](https://github.com/pudy248/noitaWandAtlas) by pudy248, building
+  on work by kaliuresis

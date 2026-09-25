@@ -10,4 +10,4 @@ dist/*
 probe/probe_log.txt
 
 # Local drafts, not part of the project
-discord-post.txt
+discord-*.txt
