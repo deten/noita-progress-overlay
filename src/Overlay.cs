@@ -17,22 +17,8 @@ namespace NoitaOverlay {
     public static readonly Color Live   = Color.FromArgb(110, 198, 122);
   }
 
-  /// <summary>
-  /// A panel that can opt out of the mouse entirely. WM_NCHITTEST is answered per window,
-  /// so the form saying HTTRANSPARENT does nothing for clicks that land on a child control:
-  /// each child has to say it too, or the click stops there.
-  /// </summary>
-  internal class ClickThrough : Panel {
-    public bool Locked;
-    protected override void WndProc(ref Message m) {
-      const int WM_NCHITTEST = 0x0084, HTTRANSPARENT = -1;
-      if (Locked && m.Msg == WM_NCHITTEST) { m.Result = (IntPtr)HTTRANSPARENT; return; }
-      base.WndProc(ref m);
-    }
-  }
-
   /// <summary>Draws the tiered board. All layout happens in one pass so hit-testing stays in sync.</summary>
-  internal sealed class Board : ClickThrough {
+  internal sealed class Board : Panel {
     public Snapshot Snap = new Snapshot();
     public bool HideDone;
     public string Toast; public DateTime ToastUntil;
@@ -333,11 +319,20 @@ namespace NoitaOverlay {
     // via SetWindowPos is silently refused while Noita holds the foreground, but the style
     // may survive if it is present in the CreateWindowEx call itself.
     // NOACTIVATE also stops the overlay stealing focus from the game when it appears.
+    //
+    // Locked adds WS_EX_TRANSPARENT. On a layered window that takes the whole window out of
+    // mouse hit-testing, so movement and clicks go to whatever is underneath, in any process.
+    // (HTTRANSPARENT from WM_NCHITTEST looks similar but only passes the mouse to windows in
+    // the same thread, so Noita never saw it.) It lives here rather than being set with
+    // SetWindowLong because WinForms rewrites the style from CreateParams whenever it
+    // refreshes, and would quietly drop it otherwise.
     protected override CreateParams CreateParams {
       get {
         const int WS_EX_TOPMOST_ = 0x00000008, WS_EX_TOOLWINDOW = 0x00000080, WS_EX_NOACTIVATE = 0x08000000;
+        const int WS_EX_TRANSPARENT = 0x00000020;
         var cp = base.CreateParams;
         cp.ExStyle |= WS_EX_TOPMOST_ | WS_EX_TOOLWINDOW | WS_EX_NOACTIVATE;
+        if (_locked) cp.ExStyle |= WS_EX_TRANSPARENT;
         return cp;
       }
     }
@@ -353,23 +348,77 @@ namespace NoitaOverlay {
       EnsureTopMost();
     }
 
+    // ---- unlocking ----------------------------------------------------------
+    // Locked, the window ignores the mouse entirely, lock button included. So unlocking has
+    // to come from elsewhere: a global hotkey that works while Noita has focus, and a tray
+    // icon as a fallback in case another program already owns the hotkey.
+
+    [System.Runtime.InteropServices.DllImport("user32.dll")]
+    static extern bool RegisterHotKey(IntPtr hWnd, int id, uint modifiers, uint vk);
+    [System.Runtime.InteropServices.DllImport("user32.dll")]
+    static extern bool UnregisterHotKey(IntPtr hWnd, int id);
+    [System.Runtime.InteropServices.DllImport("user32.dll")]
+    static extern bool DestroyIcon(IntPtr hIcon);
+    const int WM_HOTKEY = 0x0312, HotkeyLock = 1;
+    const uint MOD_CONTROL = 0x2, MOD_SHIFT = 0x4, MOD_NOREPEAT = 0x4000;
+    const string HotkeyName = "Ctrl+Shift+L";
+    bool _hotkeyOk;
+    NotifyIcon _tray;
+    IntPtr _trayIconHandle;
+
+    protected override void OnHandleCreated(EventArgs e) {
+      base.OnHandleCreated(e);
+      _hotkeyOk = RegisterHotKey(Handle, HotkeyLock, MOD_CONTROL | MOD_SHIFT | MOD_NOREPEAT, (uint)Keys.L);
+      if (_locked && _lockBtn != null) SetLocked(true);    // handle was recreated: refresh label and style
+    }
+
+    protected override void OnHandleDestroyed(EventArgs e) {
+      UnregisterHotKey(Handle, HotkeyLock);
+      base.OnHandleDestroyed(e);
+    }
+
+    protected override void OnFormClosed(FormClosedEventArgs e) {
+      if (_tray != null) { _tray.Visible = false; _tray.Dispose(); }     // no ghost icon left behind
+      if (_trayIconHandle != IntPtr.Zero) DestroyIcon(_trayIconHandle);
+      base.OnFormClosed(e);
+    }
+
+    void BuildTray() {
+      var bmp = new Bitmap(16, 16);
+      using (var g = Graphics.FromImage(bmp)) {
+        g.SmoothingMode = SmoothingMode.AntiAlias;
+        g.Clear(Color.Transparent);
+        using (var b = new SolidBrush(Color.FromArgb(40, 44, 52))) g.FillEllipse(b, 0, 0, 15, 15);
+        using (var b = new SolidBrush(Palette.Live)) g.FillEllipse(b, 4, 4, 7, 7);
+      }
+      _trayIconHandle = bmp.GetHicon();
+      bmp.Dispose();
+
+      var menu = new ContextMenuStrip { ShowImageMargin = false };
+      var toggle = new ToolStripMenuItem("Lock", null, (s, e) => SetLocked(!_locked));
+      menu.Items.Add(toggle);
+      menu.Items.Add(new ToolStripSeparator());
+      menu.Items.Add(new ToolStripMenuItem("Close overlay", null, (s, e) => Close()));
+      menu.Opening += (s, e) => toggle.Text = (_locked ? "Unlock" : "Lock") + "  (" + HotkeyName + ")";
+
+      _tray = new NotifyIcon {
+        Icon = Icon.FromHandle(_trayIconHandle), Text = "Noita overlay",
+        ContextMenuStrip = menu, Visible = true
+      };
+      _tray.DoubleClick += (s, e) => SetLocked(!_locked);
+    }
+
     // A borderless form has no resize grip, so claim the right/bottom edges by hand.
-    // When locked, every point except the lock button reports HTTRANSPARENT, which makes
-    // Windows deliver the click to whatever is underneath. Doing it per-point rather than
-    // with WS_EX_TRANSPARENT is what keeps the unlock button reachable.
     protected override void WndProc(ref Message m) {
-      const int WM_NCHITTEST = 0x0084, HTTRANSPARENT = -1, HTRIGHT = 11, HTBOTTOM = 15, HTBOTTOMRIGHT = 17;
+      const int WM_NCHITTEST = 0x0084, HTRIGHT = 11, HTBOTTOM = 15, HTBOTTOMRIGHT = 17;
+      if (m.Msg == WM_HOTKEY && m.WParam.ToInt32() == HotkeyLock) {
+        SetLocked(!_locked);
+        return;
+      }
       if (m.Msg == WM_NCHITTEST) {
         base.WndProc(ref m);
         int lp = unchecked((int)m.LParam.ToInt64());
         var p = PointToClient(new Point((short)(lp & 0xFFFF), (short)((lp >> 16) & 0xFFFF)));
-
-        if (_locked) {
-          if (_lockBtn != null && LockButtonBounds().Contains(p)) return;   // keep this one live
-          m.Result = (IntPtr)HTTRANSPARENT;
-          return;
-        }
-
         int grip = 8;
         bool r = p.X >= ClientSize.Width - grip, b = p.Y >= ClientSize.Height - grip;
         if (r && b)      m.Result = (IntPtr)HTBOTTOMRIGHT;
@@ -380,36 +429,36 @@ namespace NoitaOverlay {
       base.WndProc(ref m);
     }
 
-    /// <summary>Lock button position in form client coordinates.</summary>
-    Rectangle LockButtonBounds() {
-      return RectangleToClient(_lockBtn.RectangleToScreen(_lockBtn.ClientRectangle));
-    }
-
     bool _locked;
     Button _lockBtn, _launchBtn, _toggleBtn, _closeBtn;
-    ClickThrough _bar;
+    Panel _bar;
     string _status = "", _seed = "";
     bool _live;
 
     void SetLocked(bool on) {
       _locked = on;
       if (_lockBtn != null) {
-        _lockBtn.Text = on ? "locked" : "lock";
+        // The button cannot be clicked while locked, so it says how to get back out instead.
+        _lockBtn.Text = on ? "locked, " + (_hotkeyOk ? HotkeyName : "tray icon") + " to unlock" : "lock";
         _lockBtn.ForeColor = on ? Palette.Live : Palette.Dim;
+        _lockBtn.Width = TextRenderer.MeasureText(_lockBtn.Text, _lockBtn.Font).Width + 16;
       }
-      // Every child window has to decline the mouse for itself.
-      _board.Locked = on;
-      if (_bar != null) _bar.Locked = on;
       // Nothing but unlocking is available while locked, so the other buttons go away.
       foreach (var b in new[] { _toggleBtn, _closeBtn, _launchBtn })
         if (b != null) b.Visible = on ? false : (b != _launchBtn || !_live);
-      // Collapse back to the compact view and stay there.
       if (on) {
+        // Collapse back to the compact view and stay there.
         _overTicks = 0;
         _board.Compact = true;
         _board.Invalidate();
+        // WS_EX_TRANSPARENT only passes the mouse through on a layered window, and WinForms
+        // stops layering at 100% opacity.
+        if (Opacity >= 1.0) Opacity = 0.99;
       }
+      // Re-read CreateParams so WS_EX_TRANSPARENT is added or removed on the live window.
+      if (IsHandleCreated) { UpdateStyles(); EnsureTopMost(); }
       if (_bar != null) _bar.Invalidate();
+      if (_tray != null) _tray.Text = on ? "Noita overlay (locked)" : "Noita overlay";
       _cfg.Locked = on;
     }
 
@@ -443,6 +492,7 @@ namespace NoitaOverlay {
       }
 
       double target = open ? HoverOpacity : IdleOpacity;
+      if (_locked && target >= 1.0) target = 0.99;    // stay layered, or click-through stops working
       double d = target - Opacity;
       if (Math.Abs(d) < 0.015) { if (Opacity != target) Opacity = target; }
       else Opacity += d * 0.30;        // ease toward the target rather than snapping
@@ -662,7 +712,7 @@ namespace NoitaOverlay {
       }
       Location = loc;
 
-      var bar = new ClickThrough { Dock = DockStyle.Top, Height = barH, BackColor = Palette.BgAlt };
+      var bar = new Panel { Dock = DockStyle.Top, Height = barH, BackColor = Palette.BgAlt };
       _bar = bar;
       var close  = MakeBtn("X", (int)(28 * sc), (s, e) => Close());  _closeBtn = close;
       _board.HideDone = true;                       // default: only show what is left
@@ -737,6 +787,7 @@ namespace NoitaOverlay {
       _board.Compact = true;
       _board.HideDone = _cfg.HideDone;
       _board.ShowExtras = _cfg.ShowExtras;
+      BuildTray();                      // before SetLocked, so the tray reflects the saved state
       SetLocked(_cfg.Locked);
       toggle.Text = _board.HideDone ? "show all" : "hide done";
       _board.PinsChanged = SavePins;

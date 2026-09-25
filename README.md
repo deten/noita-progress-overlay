@@ -12,7 +12,8 @@ Not a mod, its an overlay and can also be used as a launcher, Steam achievements
 - Shows the current biome's effect, worked out from the world seed
 - Expands to the full board when you mouse over it
 - Fades to 28% opacity when you are not looking at it
-- Lock button makes it click-through, so it never gets in the way of the game
+- Lock button makes it click-through: mouse movement and clicks go straight to
+  Noita. Press **Ctrl+Shift+L** to unlock, or use the tray icon
 
 ## Screenshots
 
@@ -158,7 +159,11 @@ effect corrections. Settings live in `%APPDATA%\NoitaOverlay\settings.ini`.
 | `hover_opacity` | 0.97 |
 | `dwell_ms` | 200, delay before it expands |
 | `show_extras` | 0, the two extra lists are hidden |
-| `locked` | 0, set by the lock button |
+| `locked` | 0, set by the lock button or Ctrl+Shift+L |
+
+While locked the whole window ignores the mouse, lock button included. Unlock with
+**Ctrl+Shift+L**, which works while Noita has focus, or right click the tray icon.
+The tray icon can also close the overlay.
 
 Other files there:
 
